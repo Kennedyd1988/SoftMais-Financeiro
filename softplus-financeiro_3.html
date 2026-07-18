@@ -172,6 +172,7 @@
   <button class="nav-btn" data-view="clientes"><span class="nav-dot"></span>Clientes</button>
   <button class="nav-btn" data-view="modelos"><span class="nav-dot"></span>Modelos recorrentes</button>
   <button class="nav-btn" data-view="relatorios"><span class="nav-dot"></span>Relatórios</button>
+  <button class="nav-btn" data-view="contas" id="navContas" style="display:none;"><span class="nav-dot"></span>Contas</button>
   <button class="nav-btn" data-view="usuarios" id="navUsuarios" style="display:none;"><span class="nav-dot"></span>Usuários</button>
 
   <div style="margin-top:auto; padding-top:14px; border-top:1px solid var(--line);">
@@ -190,10 +191,13 @@
         <div class="view-title">Painel</div>
         <div class="view-desc">Visão geral do mês selecionado</div>
       </div>
-      <div class="stamp">
-        <button id="dashPrev">‹</button>
-        <span id="dashMonthLabel">—</span>
-        <button id="dashNext">›</button>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <select id="dashContaFiltro"><option value="">Todas as contas</option></select>
+        <div class="stamp">
+          <button id="dashPrev">‹</button>
+          <span id="dashMonthLabel">—</span>
+          <button id="dashNext">›</button>
+        </div>
       </div>
     </div>
 
@@ -235,11 +239,12 @@
       <button class="btn btn-ghost btn-sm" id="btnLimparCompetencia" title="Ver todos os meses">Todos os meses</button>
       <select id="filtroTipo"><option value="">Todos os tipos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option></select>
       <select id="filtroStatus"><option value="">Todos os status</option><option value="Pendente">Pendente</option><option value="Pago">Pago/Recebido</option></select>
+      <select id="filtroConta"><option value="">Todas as contas</option></select>
     </div>
 
     <div class="card" style="padding:0;">
       <table id="lancamentosTable">
-        <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Cliente/Contrato</th><th>Vencimento</th><th>Status</th><th style="text-align:right">Valor</th><th></th></tr></thead>
+        <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Conta</th><th>Cliente/Contrato</th><th>Vencimento</th><th>Status</th><th style="text-align:right">Valor</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -256,7 +261,7 @@
     </div>
     <div class="card" style="padding:0;">
       <table id="contratosTable">
-        <thead><tr><th>Cliente</th><th>Objeto</th><th>Vencimento</th><th>Vigência</th><th>Status</th><th style="text-align:right">Mensalidade</th><th></th></tr></thead>
+        <thead><tr><th>Cliente</th><th>Objeto</th><th>Conta</th><th>Vencimento</th><th>Vigência</th><th>Status</th><th style="text-align:right">Mensalidade</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -290,7 +295,7 @@
     </div>
     <div class="card" style="padding:0;">
       <table id="modelosTable">
-        <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Cliente/Contrato</th><th>Dia venc.</th><th style="text-align:right">Valor</th><th>Ativo</th><th></th></tr></thead>
+        <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Conta</th><th>Cliente/Contrato</th><th>Dia venc.</th><th style="text-align:right">Valor</th><th>Ativo</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -303,6 +308,7 @@
         <div class="view-title">Relatórios</div>
         <div class="view-desc">Entradas, saídas, impostos e lucro por mês</div>
       </div>
+      <select id="relContaFiltro"><option value="">Todas as contas</option></select>
     </div>
 
     <section class="block" style="margin-top:0;">
@@ -331,6 +337,23 @@
     </section>
   </section>
 
+  <!-- CONTAS -->
+  <section class="view" id="view-contas">
+    <div class="view-header">
+      <div>
+        <div class="view-title">Contas</div>
+        <div class="view-desc">Divisão dos lançamentos por conta (não precisa ser bancária)</div>
+      </div>
+      <button class="btn btn-primary" id="btnNovaConta">+ Nova conta</button>
+    </div>
+    <div class="card" style="padding:0;">
+      <table id="contasTable">
+        <thead><tr><th>Nome</th><th>Observações</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- USUARIOS (ADMIN ONLY) -->
   <section class="view" id="view-usuarios">
     <div class="view-header">
@@ -352,6 +375,20 @@
   </section>
 
 </main>
+
+<!-- MODAL CONTA -->
+<div class="overlay" id="overlayConta">
+  <div class="modal">
+    <h3 id="modalContaTitle">Nova conta</h3>
+    <input type="hidden" id="contaId">
+    <div class="field"><label>Nome da conta</label><input type="text" id="contaNome" placeholder="Ex: Caixa principal, Conta reserva, Sócio A..."></div>
+    <div class="field"><label>Observações</label><input type="text" id="contaObs"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('overlayConta')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarConta()">Salvar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL CLIENTE -->
 <div class="overlay" id="overlayCliente">
@@ -384,8 +421,11 @@
       <div class="field"><label>Início da vigência</label><input type="date" id="contratoInicio"></div>
       <div class="field"><label>Fim da vigência</label><input type="date" id="contratoFim"></div>
     </div>
-    <div class="field"><label>Status</label>
-      <select id="contratoStatus"><option>Ativo</option><option>Suspenso</option><option>Encerrado</option></select>
+    <div class="field-row">
+      <div class="field"><label>Status</label>
+        <select id="contratoStatus"><option>Ativo</option><option>Suspenso</option><option>Encerrado</option></select>
+      </div>
+      <div class="field"><label>Conta</label><select id="contratoConta"><option value="">Nenhuma</option></select></div>
     </div>
     <div class="field"><label>Observações (reajuste, índice, etc.)</label><input type="text" id="contratoObs"></div>
     <div class="modal-actions">
@@ -405,7 +445,10 @@
       <div class="field"><label>Tipo</label><select id="modeloTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
       <div class="field"><label>Categoria</label><select id="modeloCategoria"></select></div>
     </div>
-    <div class="field"><label>Contrato vinculado (opcional)</label><select id="modeloContrato"><option value="">Nenhum</option></select></div>
+    <div class="field-row">
+      <div class="field"><label>Contrato vinculado (opcional)</label><select id="modeloContrato"><option value="">Nenhum</option></select></div>
+      <div class="field"><label>Conta</label><select id="modeloConta"><option value="">Nenhuma</option></select></div>
+    </div>
     <div class="field-row">
       <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="modeloValor"></div>
       <div class="field"><label>Dia do mês</label><input type="number" min="1" max="28" id="modeloDia"></div>
@@ -428,7 +471,10 @@
       <div class="field"><label>Tipo</label><select id="lancTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
       <div class="field"><label>Categoria</label><select id="lancCategoria"></select></div>
     </div>
-    <div class="field"><label>Cliente/Contrato (opcional)</label><select id="lancContrato"><option value="">Nenhum</option></select></div>
+    <div class="field-row">
+      <div class="field"><label>Cliente/Contrato (opcional)</label><select id="lancContrato"><option value="">Nenhum</option></select></div>
+      <div class="field"><label>Conta</label><select id="lancConta"><option value="">Nenhuma</option></select></div>
+    </div>
     <div class="field-row">
       <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="lancValor"></div>
       <div class="field"><label>Data prevista</label><input type="date" id="lancData"></div>
@@ -482,7 +528,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[] };
+let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[], contas:[] };
 let dashDate = new Date();
 let currentUser = null;
 
@@ -536,7 +582,7 @@ function toast(msg){
   clearTimeout(window._toastTimer); window._toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
 
-const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios'];
+const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios','contas'];
 const loadedTables = new Set();
 
 function seedCategoriasIfNeeded(){
@@ -584,6 +630,7 @@ function catName(id){ const c=DB.categorias.find(x=>x.id===id); return c?c.nome:
 function catImpostoId(){ const c=DB.categorias.find(x=>x.nome==='Imposto'); return c?c.id:null; }
 function clienteNome(id){ const c=DB.clientes.find(x=>x.id===id); return c?c.nome:'—'; }
 function contratoLabel(id){ const c=DB.contratos.find(x=>x.id===id); if(!c) return '—'; return `${clienteNome(c.clienteId)} — ${c.objeto}`; }
+function contaNome(id){ const c=DB.contas.find(x=>x.id===id); return c?c.nome:'—'; }
 
 /* ---------- NAV ---------- */
 function viewIsAllowed(view){
@@ -596,6 +643,7 @@ function viewIsAllowed(view){
     case 'modelos': return canView('modelosEntradas') || canView('modelosSaidas');
     case 'relatorios': return canView('relatorios');
     case 'usuarios': return isAdmin();
+    case 'contas': return isAdmin();
     default: return false;
   }
 }
@@ -634,6 +682,7 @@ function currentComp(){ return dashDate.toISOString().slice(0,7); }
 
 document.getElementById('dashPrev').onclick=()=>{ dashDate.setMonth(dashDate.getMonth()-1); renderAll(); };
 document.getElementById('dashNext').onclick=()=>{ dashDate.setMonth(dashDate.getMonth()+1); renderAll(); };
+document.getElementById('dashContaFiltro').addEventListener('change', renderDashboard);
 
 /* ---------- RENDER ALL ---------- */
 function renderAll(){
@@ -645,7 +694,14 @@ function renderAll(){
   renderModelos();
   renderRelatorios();
   renderUsuarios();
+  renderContas();
   fillSelects();
+}
+
+function setOptionsPreserveValue(sel, optionsHtml){
+  const prev = sel.value;
+  sel.innerHTML = optionsHtml;
+  if(Array.from(sel.options).some(o=>o.value===prev)) sel.value = prev;
 }
 
 function fillSelects(){
@@ -655,6 +711,16 @@ function fillSelects(){
   const contratoOpts = '<option value="">Nenhum</option>' + DB.contratos.map(c=>`<option value="${c.id}">${clienteNome(c.clienteId)} — ${c.objeto}</option>`).join('');
   document.getElementById('modeloContrato').innerHTML = contratoOpts;
   document.getElementById('lancContrato').innerHTML = contratoOpts;
+
+  const contaOptsNenhuma = '<option value="">Nenhuma</option>' + DB.contas.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+  setOptionsPreserveValue(document.getElementById('modeloConta'), contaOptsNenhuma);
+  setOptionsPreserveValue(document.getElementById('lancConta'), contaOptsNenhuma);
+  setOptionsPreserveValue(document.getElementById('contratoConta'), contaOptsNenhuma);
+
+  const contaOptsTodas = '<option value="">Todas as contas</option>' + DB.contas.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+  setOptionsPreserveValue(document.getElementById('filtroConta'), contaOptsTodas);
+  setOptionsPreserveValue(document.getElementById('dashContaFiltro'), contaOptsTodas);
+  setOptionsPreserveValue(document.getElementById('relContaFiltro'), contaOptsTodas);
 
   refreshCategoriaSelect('modeloCategoria', document.getElementById('modeloTipo').value);
   refreshCategoriaSelect('lancCategoria', document.getElementById('lancTipo').value);
@@ -675,7 +741,12 @@ function renderDashboard(){
   const modoGeral = canView('painelGeral');
   const podeEditarPainel = canEdit('painelGeral');
 
-  const lancComp = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp);
+  const contaSel = document.getElementById('dashContaFiltro');
+  contaSel.style.display = modoGeral ? '' : 'none';
+  const contaFiltro = modoGeral ? contaSel.value : '';
+
+  let lancComp = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp);
+  if(contaFiltro) lancComp = lancComp.filter(l=>l.contaId===contaFiltro);
   const impostoId = catImpostoId();
 
   const entradasPagas = lancComp.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
@@ -686,12 +757,13 @@ function renderDashboard(){
   const pendentes = lancComp.filter(l=>l.status==='Pendente');
   const pendentesValor = pendentes.reduce((s,l)=>s+l.valor,0);
 
-  const mrr = DB.contratos.filter(c=>c.status==='Ativo').reduce((s,c)=>s+(c.valorMensal||0),0);
+  const contratosAtivosFiltrados = DB.contratos.filter(c=>c.status==='Ativo' && (!contaFiltro || c.contaId===contaFiltro));
+  const mrr = contratosAtivosFiltrados.reduce((s,c)=>s+(c.valorMensal||0),0);
 
   const hoje = todayISO();
   const em60 = new Date(); em60.setDate(em60.getDate()+60);
   const em60iso = em60.toISOString().slice(0,10);
-  const contratosVencer = DB.contratos.filter(c=>c.status==='Ativo' && c.dataFim && c.dataFim>=hoje && c.dataFim<=em60iso);
+  const contratosVencer = contratosAtivosFiltrados.filter(c=>c.dataFim && c.dataFim>=hoje && c.dataFim<=em60iso);
 
   if(modoGeral){
     document.getElementById('dashCards').style.display = '';
@@ -708,8 +780,8 @@ function renderDashboard(){
 
   document.getElementById('dashCards2').innerHTML = `
     ${modoGeral
-      ? `<div class="card"><div class="metric-label">Receita recorrente mensal (MRR)</div><div class="metric-value num">${fmtMoney(mrr)}</div><div class="metric-sub">${DB.contratos.filter(c=>c.status==='Ativo').length} contrato(s) ativo(s)</div></div>`
-      : `<div class="card"><div class="metric-label">Contratos ativos</div><div class="metric-value num">${DB.contratos.filter(c=>c.status==='Ativo').length}</div></div>`}
+      ? `<div class="card"><div class="metric-label">Receita recorrente mensal (MRR)${contaFiltro?` — ${contaNome(contaFiltro)}`:''}</div><div class="metric-value num">${fmtMoney(mrr)}</div><div class="metric-sub">${contratosAtivosFiltrados.length} contrato(s) ativo(s)</div></div>`
+      : `<div class="card"><div class="metric-label">Contratos ativos</div><div class="metric-value num">${contratosAtivosFiltrados.length}</div></div>`}
     ${modoGeral ? `<div class="card"><div class="metric-label">Pendentes no mês</div><div class="metric-value num">${fmtMoney(pendentesValor)}</div><div class="metric-sub">${pendentes.length} lançamento(s)</div></div>` : ''}
     <div class="card"><div class="metric-label">Contratos a vencer</div><div class="metric-value num">${contratosVencer.length}</div><div class="metric-sub">nos próximos 60 dias</div></div>
   `;
@@ -770,6 +842,7 @@ document.getElementById('btnGerarMes').onclick = async ()=>{
     const dia = String(m.dia).padStart(2,'0');
     DB.lancamentos.push({
       id:uid(), tipo:m.tipo, categoriaId:m.categoriaId, contratoId:m.contratoId||null,
+      contaId:m.contaId||null,
       descricao:m.descricao, valor:m.valor, dataPrevista:`${ano}-${mes}-${dia}`,
       status:'Pendente', dataPagamento:null, modeloId:m.id
     });
@@ -816,6 +889,7 @@ function renderLancamentos(){
   const anoFiltro = document.getElementById('filtroAno').value;
   const tipoFiltro = document.getElementById('filtroTipo').value;
   const statusFiltro = document.getElementById('filtroStatus').value;
+  const contaFiltro = document.getElementById('filtroConta').value;
   const hoje = todayISO();
 
   const vEntradas = canView('lancEntradas'), vSaidas = canView('lancSaidas');
@@ -837,10 +911,11 @@ function renderLancamentos(){
   else if(mesFiltro) list = list.filter(l=>l.dataPrevista.slice(5,7)===mesFiltro);
   if(filtroTipoSel.value) list = list.filter(l=>l.tipo===filtroTipoSel.value);
   if(statusFiltro) list = list.filter(l=>l.status===statusFiltro);
+  if(contaFiltro) list = list.filter(l=>l.contaId===contaFiltro);
 
   const tbody = document.querySelector('#lancamentosTable tbody');
   if(list.length===0){
-    tbody.innerHTML = `<tr><td colspan="8" class="empty"><b>Nenhum lançamento encontrado</b>Gere os lançamentos do mês ou adicione um lançamento manual.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty"><b>Nenhum lançamento encontrado</b>Gere os lançamentos do mês ou adicione um lançamento manual.</td></tr>`;
     return;
   }
   tbody.innerHTML = list.map(l=>{
@@ -853,6 +928,7 @@ function renderLancamentos(){
       <td>${l.descricao}</td>
       <td>${l.tipo==='entrada'?'Entrada':'Saída'}</td>
       <td>${catName(l.categoriaId)}</td>
+      <td>${l.contaId?contaNome(l.contaId):'—'}</td>
       <td>${l.contratoId?contratoLabel(l.contratoId):'—'}</td>
       <td>${fmtDate(l.dataPrevista)}</td>
       <td>${statusBadge}</td>
@@ -864,7 +940,7 @@ function renderLancamentos(){
     </tr>`;
   }).join('');
 }
-['filtroMes','filtroAno','filtroTipo','filtroStatus'].forEach(id=>{
+['filtroMes','filtroAno','filtroTipo','filtroStatus','filtroConta'].forEach(id=>{
   document.getElementById(id).addEventListener('change', renderLancamentos);
 });
 
@@ -886,6 +962,7 @@ document.getElementById('btnNovoLancamento').onclick = ()=>{
   tipoSel.value = tipoPadrao;
   refreshCategoriaSelect('lancCategoria', tipoPadrao);
   document.getElementById('lancContrato').value='';
+  document.getElementById('lancConta').value='';
   document.getElementById('lancValor').value='';
   document.getElementById('lancData').value=todayISO();
   openModal('overlayLancamento');
@@ -899,6 +976,7 @@ function salvarLancamento(){
     id:uid(), tipo:document.getElementById('lancTipo').value,
     categoriaId:document.getElementById('lancCategoria').value,
     contratoId:document.getElementById('lancContrato').value || null,
+    contaId:document.getElementById('lancConta').value || null,
     descricao, valor, dataPrevista:data, status:'Pendente', dataPagamento:null, modeloId:null
   });
   save('lancamentos').then(()=>{ closeModal('overlayLancamento'); toast('Lançamento adicionado'); renderAll(); });
@@ -910,7 +988,7 @@ function renderContratos(){
   document.getElementById('btnNovoContrato').style.display = podeEditar ? '' : 'none';
   const tbody = document.querySelector('#contratosTable tbody');
   if(DB.contratos.length===0){
-    tbody.innerHTML = `<tr><td colspan="7" class="empty"><b>Nenhum contrato cadastrado</b>Adicione o primeiro contrato de locação de software.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty"><b>Nenhum contrato cadastrado</b>Adicione o primeiro contrato de locação de software.</td></tr>`;
     return;
   }
   tbody.innerHTML = DB.contratos.map(c=>{
@@ -918,6 +996,7 @@ function renderContratos(){
     return `<tr>
       <td>${clienteNome(c.clienteId)}</td>
       <td>${c.objeto}</td>
+      <td>${c.contaId?contaNome(c.contaId):'—'}</td>
       <td>dia ${c.diaVencimento}</td>
       <td>${fmtDate(c.dataInicio)} — ${c.dataFim?fmtDate(c.dataFim):'indeterminado'}</td>
       <td><span class="badge ${badgeClass}">${c.status}</span></td>
@@ -940,6 +1019,7 @@ document.getElementById('btnNovoContrato').onclick = ()=>{
   document.getElementById('contratoInicio').value=todayISO();
   document.getElementById('contratoFim').value='';
   document.getElementById('contratoStatus').value='Ativo';
+  document.getElementById('contratoConta').value='';
   document.getElementById('contratoObs').value='';
   openModal('overlayContrato');
 };
@@ -955,6 +1035,7 @@ function editarContrato(id){
   document.getElementById('contratoInicio').value=c.dataInicio;
   document.getElementById('contratoFim').value=c.dataFim||'';
   document.getElementById('contratoStatus').value=c.status;
+  document.getElementById('contratoConta').value=c.contaId||'';
   document.getElementById('contratoObs').value=c.obs||'';
   openModal('overlayContrato');
 }
@@ -971,6 +1052,7 @@ function salvarContrato(){
     dataInicio:document.getElementById('contratoInicio').value,
     dataFim:document.getElementById('contratoFim').value||null,
     status:document.getElementById('contratoStatus').value,
+    contaId:document.getElementById('contratoConta').value || null,
     obs:document.getElementById('contratoObs').value
   };
   if(id){ Object.assign(DB.contratos.find(c=>c.id===id), data); }
@@ -1045,7 +1127,7 @@ function renderModelos(){
   const list = DB.modelos.filter(m => (m.tipo==='entrada' && vEntradas) || (m.tipo==='saida' && vSaidas));
   const tbody = document.querySelector('#modelosTable tbody');
   if(list.length===0){
-    tbody.innerHTML = `<tr><td colspan="8" class="empty"><b>Nenhum modelo cadastrado</b>Crie modelos para as mensalidades e despesas fixas de todo mês.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty"><b>Nenhum modelo cadastrado</b>Crie modelos para as mensalidades e despesas fixas de todo mês.</td></tr>`;
     return;
   }
   tbody.innerHTML = list.map(m=>{
@@ -1054,6 +1136,7 @@ function renderModelos(){
       <td>${m.descricao}</td>
       <td>${m.tipo==='entrada'?'Entrada':'Saída'}</td>
       <td>${catName(m.categoriaId)}</td>
+      <td>${m.contaId?contaNome(m.contaId):'—'}</td>
       <td>${m.contratoId?contratoLabel(m.contratoId):'—'}</td>
       <td>dia ${m.dia}</td>
       <td class="cell-num">${fmtMoney(m.valor)}</td>
@@ -1078,6 +1161,7 @@ document.getElementById('btnNovoModelo').onclick = ()=>{
   tipoSel.value = tipoPadrao;
   refreshCategoriaSelect('modeloCategoria', tipoPadrao);
   document.getElementById('modeloContrato').value='';
+  document.getElementById('modeloConta').value='';
   document.getElementById('modeloValor').value='';
   document.getElementById('modeloDia').value='10';
   document.getElementById('modeloAtivo').checked=true;
@@ -1097,6 +1181,7 @@ function editarModelo(id){
   refreshCategoriaSelect('modeloCategoria', m.tipo);
   document.getElementById('modeloCategoria').value=m.categoriaId;
   document.getElementById('modeloContrato').value=m.contratoId||'';
+  document.getElementById('modeloConta').value=m.contaId||'';
   document.getElementById('modeloValor').value=m.valor;
   document.getElementById('modeloDia').value=m.dia;
   document.getElementById('modeloAtivo').checked=m.ativo;
@@ -1114,6 +1199,7 @@ function salvarModelo(){
     descricao, tipo,
     categoriaId:document.getElementById('modeloCategoria').value,
     contratoId:document.getElementById('modeloContrato').value || null,
+    contaId:document.getElementById('modeloConta').value || null,
     valor, dia:parseInt(document.getElementById('modeloDia').value)||10,
     ativo:document.getElementById('modeloAtivo').checked
   };
@@ -1138,17 +1224,19 @@ function ultimosMeses(n){
   }
   return arr;
 }
-function resumoMes(comp){
+function resumoMes(comp, contaId){
   const impostoId = catImpostoId();
-  const list = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago');
+  let list = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago');
+  if(contaId) list = list.filter(l=>l.contaId===contaId);
   const entradas = list.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
   const impostos = list.filter(l=>l.tipo==='saida' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
   const saidas = list.filter(l=>l.tipo==='saida' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
   return { entradas, saidas, impostos, lucro: entradas-saidas-impostos };
 }
 function renderRelatorios(){
+  const contaFiltro = document.getElementById('relContaFiltro').value;
   const meses = ultimosMeses(6);
-  const dados = meses.map(m=>({m, ...resumoMes(m)}));
+  const dados = meses.map(m=>({m, ...resumoMes(m, contaFiltro)}));
   const maxVal = Math.max(1, ...dados.map(d=>Math.max(d.entradas, d.saidas+d.impostos)));
 
   document.getElementById('relBars').innerHTML = dados.map(d=>{
@@ -1176,9 +1264,8 @@ function renderRelatorios(){
     </tr>`).join('');
 
   const comp = currentComp();
-  const impostoId = catImpostoId();
   const porCliente = {};
-  DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago' && l.tipo==='entrada' && l.contratoId).forEach(l=>{
+  DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago' && l.tipo==='entrada' && l.contratoId && (!contaFiltro || l.contaId===contaFiltro)).forEach(l=>{
     const contrato = DB.contratos.find(c=>c.id===l.contratoId);
     if(!contrato) return;
     const cli = clienteNome(contrato.clienteId);
@@ -1191,6 +1278,58 @@ function renderRelatorios(){
   }else{
     tbody2.innerHTML = entries.map(([nome,val])=>`<tr><td>${nome}</td><td class="cell-num" style="color:var(--green)">${fmtMoney(val)}</td></tr>`).join('');
   }
+}
+document.getElementById('relContaFiltro').addEventListener('change', renderRelatorios);
+
+/* ---------- CONTAS (ADMIN) ---------- */
+function renderContas(){
+  if(!isAdmin()) return;
+  const tbody = document.querySelector('#contasTable tbody');
+  if(!tbody) return;
+  if(DB.contas.length===0){
+    tbody.innerHTML = `<tr><td colspan="3" class="empty"><b>Nenhuma conta cadastrada</b>Crie contas para dividir os lançamentos (não precisa ser bancária).</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = DB.contas.map(c=>`<tr>
+      <td>${c.nome}</td>
+      <td style="color:var(--text-dim);">${c.obs||'—'}</td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Editar" onclick="editarConta('${c.id}')">✎</button>
+        <button class="icon-btn" title="Excluir" onclick="excluirConta('${c.id}')">✕</button>
+      </td>
+    </tr>`).join('');
+}
+document.getElementById('btnNovaConta').onclick = ()=>{
+  if(!isAdmin()) return;
+  document.getElementById('modalContaTitle').textContent='Nova conta';
+  document.getElementById('contaId').value='';
+  document.getElementById('contaNome').value='';
+  document.getElementById('contaObs').value='';
+  openModal('overlayConta');
+};
+function editarConta(id){
+  if(!isAdmin()) return;
+  const c = DB.contas.find(x=>x.id===id); if(!c) return;
+  document.getElementById('modalContaTitle').textContent='Editar conta';
+  document.getElementById('contaId').value=c.id;
+  document.getElementById('contaNome').value=c.nome;
+  document.getElementById('contaObs').value=c.obs||'';
+  openModal('overlayConta');
+}
+function salvarConta(){
+  if(!isAdmin()) return;
+  const nome = document.getElementById('contaNome').value.trim();
+  if(!nome){ toast('Informe o nome da conta'); return; }
+  const id = document.getElementById('contaId').value;
+  const data = { nome, obs:document.getElementById('contaObs').value };
+  if(id){ Object.assign(DB.contas.find(c=>c.id===id), data); }
+  else{ DB.contas.push({id:uid(), ...data}); }
+  save('contas').then(()=>{ closeModal('overlayConta'); toast('Conta salva'); renderAll(); });
+}
+function excluirConta(id){
+  if(!isAdmin()) return;
+  DB.contas = DB.contas.filter(c=>c.id!==id);
+  save('contas').then(()=>{ toast('Conta excluída'); renderAll(); });
 }
 
 /* ---------- USUARIOS (ADMIN) ---------- */
