@@ -229,7 +229,9 @@
     </div>
 
     <div class="filters">
-      <input type="text" id="filtroCompetencia" placeholder="Competência AAAA-MM" style="width:150px;">
+      <select id="filtroMes"></select>
+      <select id="filtroAno"></select>
+      <button class="btn btn-ghost btn-sm" id="btnLimparCompetencia" title="Ver todos os meses">Todos os meses</button>
       <select id="filtroTipo"><option value="">Todos os tipos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option></select>
       <select id="filtroStatus"><option value="">Todos os status</option><option value="Pendente">Pendente</option><option value="Pago">Pago/Recebido</option></select>
     </div>
@@ -634,14 +636,47 @@ document.getElementById('btnGerarMes').onclick = async ()=>{
 };
 
 /* ---------- LANÇAMENTOS VIEW ---------- */
+(function initCompetenciaFilters(){
+  const mesSel = document.getElementById('filtroMes');
+  const anoSel = document.getElementById('filtroAno');
+  const meses = ['Todos os meses','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  meses.forEach((m,i)=>{
+    const opt = document.createElement('option');
+    opt.value = i===0 ? '' : String(i).padStart(2,'0');
+    opt.textContent = m;
+    mesSel.appendChild(opt);
+  });
+  const optTodosAnos = document.createElement('option');
+  optTodosAnos.value=''; optTodosAnos.textContent='Todos os anos';
+  anoSel.appendChild(optTodosAnos);
+  const anoAtual = new Date().getFullYear();
+  for(let y=anoAtual-3; y<=anoAtual+10; y++){
+    const opt = document.createElement('option');
+    opt.value = String(y); opt.textContent = String(y);
+    anoSel.appendChild(opt);
+  }
+  const hoje = new Date();
+  mesSel.value = String(hoje.getMonth()+1).padStart(2,'0');
+  anoSel.value = String(hoje.getFullYear());
+})();
+
+document.getElementById('btnLimparCompetencia').addEventListener('click', ()=>{
+  document.getElementById('filtroMes').value = '';
+  document.getElementById('filtroAno').value = '';
+  renderLancamentos();
+});
+
 function renderLancamentos(){
-  const compFiltro = document.getElementById('filtroCompetencia').value.trim();
+  const mesFiltro = document.getElementById('filtroMes').value;
+  const anoFiltro = document.getElementById('filtroAno').value;
   const tipoFiltro = document.getElementById('filtroTipo').value;
   const statusFiltro = document.getElementById('filtroStatus').value;
   const hoje = todayISO();
 
   let list = [...DB.lancamentos].sort((a,b)=>b.dataPrevista.localeCompare(a.dataPrevista));
-  if(compFiltro) list = list.filter(l=>compOf(l.dataPrevista)===compFiltro);
+  if(anoFiltro && mesFiltro) list = list.filter(l=>compOf(l.dataPrevista)===`${anoFiltro}-${mesFiltro}`);
+  else if(anoFiltro) list = list.filter(l=>l.dataPrevista.slice(0,4)===anoFiltro);
+  else if(mesFiltro) list = list.filter(l=>l.dataPrevista.slice(5,7)===mesFiltro);
   if(tipoFiltro) list = list.filter(l=>l.tipo===tipoFiltro);
   if(statusFiltro) list = list.filter(l=>l.status===statusFiltro);
 
@@ -670,8 +705,7 @@ function renderLancamentos(){
     </tr>`;
   }).join('');
 }
-['filtroCompetencia','filtroTipo','filtroStatus'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', renderLancamentos);
+['filtroMes','filtroAno','filtroTipo','filtroStatus'].forEach(id=>{
   document.getElementById(id).addEventListener('change', renderLancamentos);
 });
 
