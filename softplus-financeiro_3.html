@@ -172,6 +172,7 @@
   <button class="nav-btn" data-view="clientes"><span class="nav-dot"></span>Clientes</button>
   <button class="nav-btn" data-view="modelos"><span class="nav-dot"></span>Modelos recorrentes</button>
   <button class="nav-btn" data-view="relatorios"><span class="nav-dot"></span>Relatórios</button>
+  <button class="nav-btn" data-view="usuarios" id="navUsuarios" style="display:none;"><span class="nav-dot"></span>Usuários</button>
 
   <div style="margin-top:auto; padding-top:14px; border-top:1px solid var(--line);">
     <p style="font-size:11.5px; color:var(--text-faint); padding:0 8px 4px;">Conectado como</p>
@@ -210,7 +211,7 @@
     <section class="block">
       <div class="block-title">Contratos a vencer (próximos 60 dias)</div>
       <div class="card" style="padding:0;">
-        <table id="dashContratosVencerTable"><thead><tr><th>Cliente</th><th>Objeto</th><th>Fim da vigência</th><th style="text-align:right">Mensalidade</th></tr></thead><tbody></tbody></table>
+        <table id="dashContratosVencerTable"><thead><tr><th>Cliente</th><th>Objeto</th><th>Fim da vigência</th><th id="colMensalidadeVencer" style="text-align:right">Mensalidade</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
   </section>
@@ -330,6 +331,26 @@
     </section>
   </section>
 
+  <!-- USUARIOS (ADMIN ONLY) -->
+  <section class="view" id="view-usuarios">
+    <div class="view-header">
+      <div>
+        <div class="view-title">Usuários</div>
+        <div class="view-desc">Controle de acesso — defina o que cada cadastrador pode ver e editar</div>
+      </div>
+      <button class="btn btn-primary" id="btnNovoUsuario">+ Novo usuário</button>
+    </div>
+    <div class="card" style="padding:0;">
+      <table id="usuariosTable">
+        <thead><tr><th>E-mail</th><th>Perfil</th><th>Permissões</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p style="font-size:12px; color:var(--text-faint); margin-top:10px;">
+      O e-mail precisa já existir em Authentication → Users no console do Firebase. Cadastrar aqui só define o que a pessoa vê dentro do app — não cria o login dela.
+    </p>
+  </section>
+
 </main>
 
 <!-- MODAL CLIENTE -->
@@ -433,11 +454,75 @@
   </div>
 </div>
 
+<!-- MODAL USUARIO -->
+<div class="overlay" id="overlayUsuario">
+  <div class="modal" style="max-width:560px;">
+    <h3 id="modalUsuarioTitle">Novo usuário</h3>
+    <input type="hidden" id="usuarioId">
+    <div class="field"><label>E-mail (já cadastrado no Firebase Authentication)</label><input type="text" id="usuarioEmail" placeholder="pessoa@exemplo.com"></div>
+    <div class="field"><label>Perfil</label>
+      <select id="usuarioRole">
+        <option value="cadastrador">Cadastrador (permissões personalizadas)</option>
+        <option value="admin">Administrador (acesso total)</option>
+      </select>
+    </div>
+    <div id="permissoesBox">
+      <table style="width:100%; font-size:12.5px; margin-top:6px;">
+        <thead><tr><th style="text-align:left; padding:4px 0;">Página</th><th style="width:70px; text-align:center;">Ver</th><th style="width:70px; text-align:center;">Editar</th></tr></thead>
+        <tbody id="permissoesTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('overlayUsuario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarUsuario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[] };
+let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[] };
 let dashDate = new Date();
+let currentUser = null;
+
+const PERMISSION_SECTIONS = [
+  {key:'painelGeral', label:'Painel — geral'},
+  {key:'painelContratos', label:'Painel — apenas contratos'},
+  {key:'lancEntradas', label:'Lançamentos — entradas'},
+  {key:'lancSaidas', label:'Lançamentos — saídas'},
+  {key:'contratos', label:'Contratos'},
+  {key:'clientes', label:'Clientes'},
+  {key:'modelosEntradas', label:'Modelos recorrentes — entradas'},
+  {key:'modelosSaidas', label:'Modelos recorrentes — saídas'},
+  {key:'relatorios', label:'Relatórios'}
+];
+function blankPermissoes(){
+  const p = {};
+  PERMISSION_SECTIONS.forEach(s=>{ p[s.key] = {ver:false, editar:false}; });
+  return p;
+}
+function isAdmin(){ return !!(currentUser && currentUser.role==='admin'); }
+function perm(key){
+  if(isAdmin()) return {ver:true, editar:true};
+  if(currentUser && currentUser.permissoes && currentUser.permissoes[key]) return currentUser.permissoes[key];
+  return {ver:false, editar:false};
+}
+function canView(key){ const p=perm(key); return !!(p.ver || p.editar); }
+function canEdit(key){ return !!perm(key).editar; }
+
+function resolveCurrentUser(){
+  const email = (window.currentAuthEmail || '').toLowerCase();
+  if(!email) return;
+  if(DB.usuarios.length===0 && !window._usuariosSeeded){
+    window._usuariosSeeded = true;
+    DB.usuarios = [{id:uid(), email, role:'admin', permissoes:blankPermissoes()}];
+    save('usuarios');
+  }
+  currentUser = DB.usuarios.find(u=>(u.email||'').toLowerCase()===email) || null;
+  const navU = document.getElementById('navUsuarios');
+  if(navU) navU.style.display = isAdmin() ? '' : 'none';
+}
 
 const fmtMoney = v => (v||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const fmtDate = s => { if(!s) return '—'; const [y,m,d]=s.split('-'); return `${d}/${m}/${y}`; };
@@ -451,7 +536,7 @@ function toast(msg){
   clearTimeout(window._toastTimer); window._toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
 
-const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos'];
+const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios'];
 const loadedTables = new Set();
 
 function seedCategoriasIfNeeded(){
@@ -477,9 +562,11 @@ function appStart(){
     window.fbWatch(k, arr=>{
       DB[k] = arr || [];
       loadedTables.add(k);
-      if(loadedTables.size===TABLE_KEYS.length && !window._seeded){
-        window._seeded = true;
-        seedCategoriasIfNeeded();
+      if(loadedTables.size===TABLE_KEYS.length){
+        if(!window._seeded){ window._seeded = true; seedCategoriasIfNeeded(); }
+        resolveCurrentUser();
+      } else if(k==='usuarios'){
+        resolveCurrentUser();
       }
       renderAll();
     });
@@ -499,8 +586,42 @@ function clienteNome(id){ const c=DB.clientes.find(x=>x.id===id); return c?c.nom
 function contratoLabel(id){ const c=DB.contratos.find(x=>x.id===id); if(!c) return '—'; return `${clienteNome(c.clienteId)} — ${c.objeto}`; }
 
 /* ---------- NAV ---------- */
+function viewIsAllowed(view){
+  if(isAdmin()) return true;
+  switch(view){
+    case 'dashboard': return canView('painelGeral') || canView('painelContratos');
+    case 'lancamentos': return canView('lancEntradas') || canView('lancSaidas');
+    case 'contratos': return canView('contratos');
+    case 'clientes': return canView('clientes');
+    case 'modelos': return canView('modelosEntradas') || canView('modelosSaidas');
+    case 'relatorios': return canView('relatorios');
+    case 'usuarios': return isAdmin();
+    default: return false;
+  }
+}
+function applyNavVisibility(){
+  let activeHidden = false;
+  document.querySelectorAll('.nav-btn').forEach(btn=>{
+    const view = btn.dataset.view;
+    if(!view) return;
+    const allowed = viewIsAllowed(view);
+    btn.style.display = allowed ? '' : 'none';
+    if(btn.classList.contains('active') && !allowed) activeHidden = true;
+  });
+  if(activeHidden){
+    const firstVisible = Array.from(document.querySelectorAll('.nav-btn')).find(b=>b.dataset.view && b.style.display!=='none');
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    if(firstVisible){
+      firstVisible.classList.add('active');
+      document.getElementById('view-'+firstVisible.dataset.view).classList.add('active');
+    }
+  }
+}
+
 document.querySelectorAll('.nav-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    if(!btn.dataset.view || !viewIsAllowed(btn.dataset.view)) return;
     document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     btn.classList.add('active');
@@ -516,12 +637,14 @@ document.getElementById('dashNext').onclick=()=>{ dashDate.setMonth(dashDate.get
 
 /* ---------- RENDER ALL ---------- */
 function renderAll(){
+  applyNavVisibility();
   renderDashboard();
   renderLancamentos();
   renderContratos();
   renderClientes();
   renderModelos();
   renderRelatorios();
+  renderUsuarios();
   fillSelects();
 }
 
@@ -549,6 +672,9 @@ function renderDashboard(){
   const comp = currentComp();
   document.getElementById('dashMonthLabel').textContent = monthLabel(comp);
 
+  const modoGeral = canView('painelGeral');
+  const podeEditarPainel = canEdit('painelGeral');
+
   const lancComp = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp);
   const impostoId = catImpostoId();
 
@@ -567,41 +693,57 @@ function renderDashboard(){
   const em60iso = em60.toISOString().slice(0,10);
   const contratosVencer = DB.contratos.filter(c=>c.status==='Ativo' && c.dataFim && c.dataFim>=hoje && c.dataFim<=em60iso);
 
-  document.getElementById('dashCards').innerHTML = `
-    <div class="card"><div class="metric-label">Entradas recebidas</div><div class="metric-value pos num">${fmtMoney(entradasPagas)}</div></div>
-    <div class="card"><div class="metric-label">Saídas pagas</div><div class="metric-value neg num">${fmtMoney(saidasPagas)}</div></div>
-    <div class="card"><div class="metric-label">Impostos pagos</div><div class="metric-value neg num">${fmtMoney(impostosPagos)}</div></div>
-    <div class="card"><div class="metric-label">Lucro líquido</div><div class="metric-value ${lucro>=0?'pos':'neg'} num">${fmtMoney(lucro)}</div></div>
-  `;
+  if(modoGeral){
+    document.getElementById('dashCards').style.display = '';
+    document.getElementById('dashCards').innerHTML = `
+      <div class="card"><div class="metric-label">Entradas recebidas</div><div class="metric-value pos num">${fmtMoney(entradasPagas)}</div></div>
+      <div class="card"><div class="metric-label">Saídas pagas</div><div class="metric-value neg num">${fmtMoney(saidasPagas)}</div></div>
+      <div class="card"><div class="metric-label">Impostos pagos</div><div class="metric-value neg num">${fmtMoney(impostosPagos)}</div></div>
+      <div class="card"><div class="metric-label">Lucro líquido</div><div class="metric-value ${lucro>=0?'pos':'neg'} num">${fmtMoney(lucro)}</div></div>
+    `;
+  }else{
+    document.getElementById('dashCards').innerHTML = '';
+    document.getElementById('dashCards').style.display = 'none';
+  }
 
   document.getElementById('dashCards2').innerHTML = `
-    <div class="card"><div class="metric-label">Receita recorrente mensal (MRR)</div><div class="metric-value num">${fmtMoney(mrr)}</div><div class="metric-sub">${DB.contratos.filter(c=>c.status==='Ativo').length} contrato(s) ativo(s)</div></div>
-    <div class="card"><div class="metric-label">Pendentes no mês</div><div class="metric-value num">${fmtMoney(pendentesValor)}</div><div class="metric-sub">${pendentes.length} lançamento(s)</div></div>
+    ${modoGeral
+      ? `<div class="card"><div class="metric-label">Receita recorrente mensal (MRR)</div><div class="metric-value num">${fmtMoney(mrr)}</div><div class="metric-sub">${DB.contratos.filter(c=>c.status==='Ativo').length} contrato(s) ativo(s)</div></div>`
+      : `<div class="card"><div class="metric-label">Contratos ativos</div><div class="metric-value num">${DB.contratos.filter(c=>c.status==='Ativo').length}</div></div>`}
+    ${modoGeral ? `<div class="card"><div class="metric-label">Pendentes no mês</div><div class="metric-value num">${fmtMoney(pendentesValor)}</div><div class="metric-sub">${pendentes.length} lançamento(s)</div></div>` : ''}
     <div class="card"><div class="metric-label">Contratos a vencer</div><div class="metric-value num">${contratosVencer.length}</div><div class="metric-sub">nos próximos 60 dias</div></div>
   `;
 
-  const tbody = document.querySelector('#dashPendentesTable tbody');
-  if(pendentes.length===0){
-    tbody.innerHTML = `<tr><td colspan="5" class="empty"><b>Nenhum pendente</b>Todos os lançamentos deste mês já foram confirmados.</td></tr>`;
+  const pendentesBlock = document.getElementById('dashPendentesTable').closest('section.block');
+  if(!modoGeral){
+    pendentesBlock.style.display = 'none';
   }else{
-    tbody.innerHTML = pendentes.map(l=>{
-      const atrasado = l.dataPrevista < hoje;
-      return `<tr>
-        <td>${l.descricao}</td>
-        <td>${catName(l.categoriaId)}</td>
-        <td>${fmtDate(l.dataPrevista)} ${atrasado?'<span class="badge badge-red" style="margin-left:6px;">Atrasado</span>':''}</td>
-        <td class="cell-num">${fmtMoney(l.valor)}</td>
-        <td><button class="btn btn-sm" onclick="confirmarLancamento('${l.id}')">Confirmar</button></td>
-      </tr>`;
-    }).join('');
+    pendentesBlock.style.display = '';
+    const tbody = document.querySelector('#dashPendentesTable tbody');
+    if(pendentes.length===0){
+      tbody.innerHTML = `<tr><td colspan="5" class="empty"><b>Nenhum pendente</b>Todos os lançamentos deste mês já foram confirmados.</td></tr>`;
+    }else{
+      tbody.innerHTML = pendentes.map(l=>{
+        const atrasado = l.dataPrevista < hoje;
+        return `<tr>
+          <td>${l.descricao}</td>
+          <td>${catName(l.categoriaId)}</td>
+          <td>${fmtDate(l.dataPrevista)} ${atrasado?'<span class="badge badge-red" style="margin-left:6px;">Atrasado</span>':''}</td>
+          <td class="cell-num">${fmtMoney(l.valor)}</td>
+          <td>${podeEditarPainel ? `<button class="btn btn-sm" onclick="confirmarLancamento('${l.id}')">Confirmar</button>` : ''}</td>
+        </tr>`;
+      }).join('');
+    }
   }
 
   const tbody2 = document.querySelector('#dashContratosVencerTable tbody');
+  const colMensalidade = document.getElementById('colMensalidadeVencer');
+  colMensalidade.style.display = modoGeral ? '' : 'none';
   if(contratosVencer.length===0){
-    tbody2.innerHTML = `<tr><td colspan="4" class="empty"><b>Nada a vencer</b>Nenhum contrato ativo vence nos próximos 60 dias.</td></tr>`;
+    tbody2.innerHTML = `<tr><td colspan="${modoGeral?4:3}" class="empty"><b>Nada a vencer</b>Nenhum contrato ativo vence nos próximos 60 dias.</td></tr>`;
   }else{
     tbody2.innerHTML = contratosVencer.map(c=>`<tr>
-      <td>${clienteNome(c.clienteId)}</td><td>${c.objeto}</td><td>${fmtDate(c.dataFim)}</td><td class="cell-num">${fmtMoney(c.valorMensal)}</td>
+      <td>${clienteNome(c.clienteId)}</td><td>${c.objeto}</td><td>${fmtDate(c.dataFim)}</td>${modoGeral?`<td class="cell-num">${fmtMoney(c.valorMensal)}</td>`:''}
     </tr>`).join('');
   }
 }
@@ -609,12 +751,15 @@ function renderDashboard(){
 function confirmarLancamento(id){
   const l = DB.lancamentos.find(x=>x.id===id);
   if(!l) return;
+  const key = l.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas';
+  if(!canEdit(key) && !canEdit('painelGeral')){ toast('Sem permissão para editar'); return; }
   l.status='Pago'; l.dataPagamento=todayISO();
   save('lancamentos').then(()=>{ toast('Lançamento confirmado'); renderAll(); });
 }
 
 /* ---------- GERAR LANÇAMENTOS DO MÊS ---------- */
 document.getElementById('btnGerarMes').onclick = async ()=>{
+  if(!(isAdmin() || (canEdit('lancEntradas') && canEdit('lancSaidas')))){ toast('Sem permissão para gerar lançamentos'); return; }
   const comp = currentComp();
   const [ano,mes] = comp.split('-');
   const ativos = DB.modelos.filter(m=>m.ativo);
@@ -673,11 +818,24 @@ function renderLancamentos(){
   const statusFiltro = document.getElementById('filtroStatus').value;
   const hoje = todayISO();
 
+  const vEntradas = canView('lancEntradas'), vSaidas = canView('lancSaidas');
+  const eEntradas = canEdit('lancEntradas'), eSaidas = canEdit('lancSaidas');
+
+  const filtroTipoSel = document.getElementById('filtroTipo');
+  filtroTipoSel.innerHTML = '<option value="">Todos os tipos</option>'
+    + (vEntradas ? '<option value="entrada">Entradas</option>' : '')
+    + (vSaidas ? '<option value="saida">Saídas</option>' : '');
+  filtroTipoSel.value = tipoFiltro && ((tipoFiltro==='entrada' && vEntradas) || (tipoFiltro==='saida' && vSaidas)) ? tipoFiltro : '';
+
+  document.getElementById('btnNovoLancamento').style.display = (eEntradas || eSaidas) ? '' : 'none';
+  document.getElementById('btnGerarMes').style.display = (isAdmin() || (eEntradas && eSaidas)) ? '' : 'none';
+
   let list = [...DB.lancamentos].sort((a,b)=>b.dataPrevista.localeCompare(a.dataPrevista));
+  list = list.filter(l => (l.tipo==='entrada' && vEntradas) || (l.tipo==='saida' && vSaidas));
   if(anoFiltro && mesFiltro) list = list.filter(l=>compOf(l.dataPrevista)===`${anoFiltro}-${mesFiltro}`);
   else if(anoFiltro) list = list.filter(l=>l.dataPrevista.slice(0,4)===anoFiltro);
   else if(mesFiltro) list = list.filter(l=>l.dataPrevista.slice(5,7)===mesFiltro);
-  if(tipoFiltro) list = list.filter(l=>l.tipo===tipoFiltro);
+  if(filtroTipoSel.value) list = list.filter(l=>l.tipo===filtroTipoSel.value);
   if(statusFiltro) list = list.filter(l=>l.status===statusFiltro);
 
   const tbody = document.querySelector('#lancamentosTable tbody');
@@ -690,6 +848,7 @@ function renderLancamentos(){
     const statusBadge = l.status==='Pago'
       ? `<span class="badge badge-green">${l.tipo==='entrada'?'Recebido':'Pago'}</span>`
       : (atrasado ? `<span class="badge badge-red">Atrasado</span>` : `<span class="badge badge-amber">Pendente</span>`);
+    const podeEditarLinha = l.tipo==='entrada' ? eEntradas : eSaidas;
     return `<tr>
       <td>${l.descricao}</td>
       <td>${l.tipo==='entrada'?'Entrada':'Saída'}</td>
@@ -699,8 +858,8 @@ function renderLancamentos(){
       <td>${statusBadge}</td>
       <td class="cell-num" style="color:${l.tipo==='entrada'?'var(--green)':'var(--red)'}">${l.tipo==='entrada'?'+':'-'} ${fmtMoney(l.valor)}</td>
       <td class="row-actions">
-        ${l.status==='Pendente'?`<button class="icon-btn" title="Confirmar" onclick="confirmarLancamento('${l.id}')">✓</button>`:''}
-        <button class="icon-btn" title="Excluir" onclick="excluirLancamento('${l.id}')">✕</button>
+        ${(podeEditarLinha && l.status==='Pendente')?`<button class="icon-btn" title="Confirmar" onclick="confirmarLancamento('${l.id}')">✓</button>`:''}
+        ${podeEditarLinha?`<button class="icon-btn" title="Excluir" onclick="excluirLancamento('${l.id}')">✕</button>`:''}
       </td>
     </tr>`;
   }).join('');
@@ -710,15 +869,22 @@ function renderLancamentos(){
 });
 
 function excluirLancamento(id){
-  DB.lancamentos = DB.lancamentos.filter(l=>l.id!==id);
+  const l = DB.lancamentos.find(x=>x.id===id);
+  if(l){ const key = l.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas'; if(!canEdit(key)){ toast('Sem permissão para excluir'); return; } }
+  DB.lancamentos = DB.lancamentos.filter(x=>x.id!==id);
   save('lancamentos').then(()=>{ toast('Lançamento excluído'); renderAll(); });
 }
 
 document.getElementById('btnNovoLancamento').onclick = ()=>{
   document.getElementById('lancamentoId').value='';
   document.getElementById('lancDescricao').value='';
-  document.getElementById('lancTipo').value='entrada';
-  refreshCategoriaSelect('lancCategoria','entrada');
+  const eEntradas = canEdit('lancEntradas'), eSaidas = canEdit('lancSaidas');
+  const tipoSel = document.getElementById('lancTipo');
+  tipoSel.innerHTML = (eEntradas?'<option value="entrada">Entrada</option>':'') + (eSaidas?'<option value="saida">Saída</option>':'');
+  tipoSel.disabled = !(eEntradas && eSaidas);
+  const tipoPadrao = eEntradas ? 'entrada' : 'saida';
+  tipoSel.value = tipoPadrao;
+  refreshCategoriaSelect('lancCategoria', tipoPadrao);
   document.getElementById('lancContrato').value='';
   document.getElementById('lancValor').value='';
   document.getElementById('lancData').value=todayISO();
@@ -740,6 +906,8 @@ function salvarLancamento(){
 
 /* ---------- CONTRATOS ---------- */
 function renderContratos(){
+  const podeEditar = canEdit('contratos');
+  document.getElementById('btnNovoContrato').style.display = podeEditar ? '' : 'none';
   const tbody = document.querySelector('#contratosTable tbody');
   if(DB.contratos.length===0){
     tbody.innerHTML = `<tr><td colspan="7" class="empty"><b>Nenhum contrato cadastrado</b>Adicione o primeiro contrato de locação de software.</td></tr>`;
@@ -755,13 +923,14 @@ function renderContratos(){
       <td><span class="badge ${badgeClass}">${c.status}</span></td>
       <td class="cell-num">${fmtMoney(c.valorMensal)}</td>
       <td class="row-actions">
-        <button class="icon-btn" title="Editar" onclick="editarContrato('${c.id}')">✎</button>
-        <button class="icon-btn" title="Excluir" onclick="excluirContrato('${c.id}')">✕</button>
+        ${podeEditar?`<button class="icon-btn" title="Editar" onclick="editarContrato('${c.id}')">✎</button>
+        <button class="icon-btn" title="Excluir" onclick="excluirContrato('${c.id}')">✕</button>`:''}
       </td>
     </tr>`;
   }).join('');
 }
 document.getElementById('btnNovoContrato').onclick = ()=>{
+  if(!canEdit('contratos')) return;
   if(DB.clientes.length===0){ toast('Cadastre um cliente antes de criar um contrato'); return; }
   document.getElementById('modalContratoTitle').textContent='Novo contrato';
   document.getElementById('contratoId').value='';
@@ -775,6 +944,7 @@ document.getElementById('btnNovoContrato').onclick = ()=>{
   openModal('overlayContrato');
 };
 function editarContrato(id){
+  if(!canEdit('contratos')) return;
   const c = DB.contratos.find(x=>x.id===id); if(!c) return;
   document.getElementById('modalContratoTitle').textContent='Editar contrato';
   document.getElementById('contratoId').value=c.id;
@@ -789,6 +959,7 @@ function editarContrato(id){
   openModal('overlayContrato');
 }
 function salvarContrato(){
+  if(!canEdit('contratos')) return;
   const objeto = document.getElementById('contratoObjeto').value.trim();
   const valor = parseFloat(document.getElementById('contratoValor').value);
   if(!objeto || !valor){ toast('Preencha objeto e valor da mensalidade'); return; }
@@ -807,12 +978,15 @@ function salvarContrato(){
   save('contratos').then(()=>{ closeModal('overlayContrato'); toast('Contrato salvo'); renderAll(); });
 }
 function excluirContrato(id){
+  if(!canEdit('contratos')) return;
   DB.contratos = DB.contratos.filter(c=>c.id!==id);
   save('contratos').then(()=>{ toast('Contrato excluído'); renderAll(); });
 }
 
 /* ---------- CLIENTES ---------- */
 function renderClientes(){
+  const podeEditar = canEdit('clientes');
+  document.getElementById('btnNovoCliente').style.display = podeEditar ? '' : 'none';
   const tbody = document.querySelector('#clientesTable tbody');
   if(DB.clientes.length===0){
     tbody.innerHTML = `<tr><td colspan="5" class="empty"><b>Nenhum cliente cadastrado</b>Adicione o primeiro órgão público atendido pela SOFT+.</td></tr>`;
@@ -823,18 +997,20 @@ function renderClientes(){
     return `<tr>
       <td>${c.nome}</td><td>${c.cnpj||'—'}</td><td>${c.contato||'—'}</td><td>${ativos}</td>
       <td class="row-actions">
-        <button class="icon-btn" title="Editar" onclick="editarCliente('${c.id}')">✎</button>
-        <button class="icon-btn" title="Excluir" onclick="excluirCliente('${c.id}')">✕</button>
+        ${podeEditar?`<button class="icon-btn" title="Editar" onclick="editarCliente('${c.id}')">✎</button>
+        <button class="icon-btn" title="Excluir" onclick="excluirCliente('${c.id}')">✕</button>`:''}
       </td>
     </tr>`;
   }).join('');
 }
 document.getElementById('btnNovoCliente').onclick = ()=>{
+  if(!canEdit('clientes')) return;
   document.getElementById('modalClienteTitle').textContent='Novo cliente';
   ['clienteId','clienteNome','clienteCnpj','clienteContato','clienteObs'].forEach(id=>document.getElementById(id).value='');
   openModal('overlayCliente');
 };
 function editarCliente(id){
+  if(!canEdit('clientes')) return;
   const c = DB.clientes.find(x=>x.id===id); if(!c) return;
   document.getElementById('modalClienteTitle').textContent='Editar cliente';
   document.getElementById('clienteId').value=c.id;
@@ -845,6 +1021,7 @@ function editarCliente(id){
   openModal('overlayCliente');
 }
 function salvarCliente(){
+  if(!canEdit('clientes')) return;
   const nome = document.getElementById('clienteNome').value.trim();
   if(!nome){ toast('Informe o nome do cliente'); return; }
   const id = document.getElementById('clienteId').value;
@@ -854,18 +1031,26 @@ function salvarCliente(){
   save('clientes').then(()=>{ closeModal('overlayCliente'); toast('Cliente salvo'); renderAll(); });
 }
 function excluirCliente(id){
+  if(!canEdit('clientes')) return;
   DB.clientes = DB.clientes.filter(c=>c.id!==id);
   save('clientes').then(()=>{ toast('Cliente excluído'); renderAll(); });
 }
 
 /* ---------- MODELOS RECORRENTES ---------- */
 function renderModelos(){
+  const vEntradas = canView('modelosEntradas'), vSaidas = canView('modelosSaidas');
+  const eEntradas = canEdit('modelosEntradas'), eSaidas = canEdit('modelosSaidas');
+  document.getElementById('btnNovoModelo').style.display = (eEntradas || eSaidas) ? '' : 'none';
+
+  const list = DB.modelos.filter(m => (m.tipo==='entrada' && vEntradas) || (m.tipo==='saida' && vSaidas));
   const tbody = document.querySelector('#modelosTable tbody');
-  if(DB.modelos.length===0){
+  if(list.length===0){
     tbody.innerHTML = `<tr><td colspan="8" class="empty"><b>Nenhum modelo cadastrado</b>Crie modelos para as mensalidades e despesas fixas de todo mês.</td></tr>`;
     return;
   }
-  tbody.innerHTML = DB.modelos.map(m=>`<tr>
+  tbody.innerHTML = list.map(m=>{
+    const podeEditarLinha = m.tipo==='entrada' ? eEntradas : eSaidas;
+    return `<tr>
       <td>${m.descricao}</td>
       <td>${m.tipo==='entrada'?'Entrada':'Saída'}</td>
       <td>${catName(m.categoriaId)}</td>
@@ -874,17 +1059,24 @@ function renderModelos(){
       <td class="cell-num">${fmtMoney(m.valor)}</td>
       <td><span class="badge ${m.ativo?'badge-green':'badge-gray'}">${m.ativo?'Ativo':'Inativo'}</span></td>
       <td class="row-actions">
-        <button class="icon-btn" title="Editar" onclick="editarModelo('${m.id}')">✎</button>
-        <button class="icon-btn" title="Excluir" onclick="excluirModelo('${m.id}')">✕</button>
+        ${podeEditarLinha?`<button class="icon-btn" title="Editar" onclick="editarModelo('${m.id}')">✎</button>
+        <button class="icon-btn" title="Excluir" onclick="excluirModelo('${m.id}')">✕</button>`:''}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 document.getElementById('btnNovoModelo').onclick = ()=>{
+  const eEntradas = canEdit('modelosEntradas'), eSaidas = canEdit('modelosSaidas');
+  if(!(eEntradas || eSaidas)) return;
   document.getElementById('modalModeloTitle').textContent='Novo modelo recorrente';
   document.getElementById('modeloId').value='';
   document.getElementById('modeloDescricao').value='';
-  document.getElementById('modeloTipo').value='entrada';
-  refreshCategoriaSelect('modeloCategoria','entrada');
+  const tipoSel = document.getElementById('modeloTipo');
+  tipoSel.innerHTML = (eEntradas?'<option value="entrada">Entrada</option>':'') + (eSaidas?'<option value="saida">Saída</option>':'');
+  tipoSel.disabled = !(eEntradas && eSaidas);
+  const tipoPadrao = eEntradas ? 'entrada' : 'saida';
+  tipoSel.value = tipoPadrao;
+  refreshCategoriaSelect('modeloCategoria', tipoPadrao);
   document.getElementById('modeloContrato').value='';
   document.getElementById('modeloValor').value='';
   document.getElementById('modeloDia').value='10';
@@ -893,10 +1085,15 @@ document.getElementById('btnNovoModelo').onclick = ()=>{
 };
 function editarModelo(id){
   const m = DB.modelos.find(x=>x.id===id); if(!m) return;
+  const key = m.tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas';
+  if(!canEdit(key)) return;
   document.getElementById('modalModeloTitle').textContent='Editar modelo recorrente';
   document.getElementById('modeloId').value=m.id;
   document.getElementById('modeloDescricao').value=m.descricao;
-  document.getElementById('modeloTipo').value=m.tipo;
+  const tipoSel = document.getElementById('modeloTipo');
+  tipoSel.innerHTML = `<option value="${m.tipo}">${m.tipo==='entrada'?'Entrada':'Saída'}</option>`;
+  tipoSel.value = m.tipo;
+  tipoSel.disabled = true;
   refreshCategoriaSelect('modeloCategoria', m.tipo);
   document.getElementById('modeloCategoria').value=m.categoriaId;
   document.getElementById('modeloContrato').value=m.contratoId||'';
@@ -909,9 +1106,12 @@ function salvarModelo(){
   const descricao = document.getElementById('modeloDescricao').value.trim();
   const valor = parseFloat(document.getElementById('modeloValor').value);
   if(!descricao || !valor){ toast('Preencha descrição e valor'); return; }
+  const tipo = document.getElementById('modeloTipo').value;
+  const key = tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas';
+  if(!canEdit(key)){ toast('Sem permissão para salvar'); return; }
   const id = document.getElementById('modeloId').value;
   const data = {
-    descricao, tipo:document.getElementById('modeloTipo').value,
+    descricao, tipo,
     categoriaId:document.getElementById('modeloCategoria').value,
     contratoId:document.getElementById('modeloContrato').value || null,
     valor, dia:parseInt(document.getElementById('modeloDia').value)||10,
@@ -922,7 +1122,9 @@ function salvarModelo(){
   save('modelos').then(()=>{ closeModal('overlayModelo'); toast('Modelo salvo'); renderAll(); });
 }
 function excluirModelo(id){
-  DB.modelos = DB.modelos.filter(m=>m.id!==id);
+  const m = DB.modelos.find(x=>x.id===id);
+  if(m){ const key = m.tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas'; if(!canEdit(key)){ toast('Sem permissão para excluir'); return; } }
+  DB.modelos = DB.modelos.filter(x=>x.id!==id);
   save('modelos').then(()=>{ toast('Modelo excluído'); renderAll(); });
 }
 
@@ -989,6 +1191,107 @@ function renderRelatorios(){
   }else{
     tbody2.innerHTML = entries.map(([nome,val])=>`<tr><td>${nome}</td><td class="cell-num" style="color:var(--green)">${fmtMoney(val)}</td></tr>`).join('');
   }
+}
+
+/* ---------- USUARIOS (ADMIN) ---------- */
+function renderUsuarios(){
+  if(!isAdmin()) return;
+  const tbody = document.querySelector('#usuariosTable tbody');
+  if(!tbody) return;
+  if(DB.usuarios.length===0){
+    tbody.innerHTML = `<tr><td colspan="4" class="empty"><b>Nenhum usuário cadastrado</b>Adicione um cadastrador e defina o que ele pode acessar.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = DB.usuarios.map(u=>{
+    const resumo = u.role==='admin' ? 'Acesso total' : PERMISSION_SECTIONS.filter(s=>{
+      const p = (u.permissoes && u.permissoes[s.key]) || {};
+      return p.ver || p.editar;
+    }).map(s=>s.label).join(', ') || 'Sem acesso a nenhuma página';
+    return `<tr>
+      <td>${u.email}</td>
+      <td><span class="badge ${u.role==='admin'?'badge-green':'badge-gray'}">${u.role==='admin'?'Administrador':'Cadastrador'}</span></td>
+      <td style="font-size:12px; color:var(--text-dim);">${resumo}</td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Editar" onclick="editarUsuario('${u.id}')">✎</button>
+        <button class="icon-btn" title="Excluir" onclick="excluirUsuario('${u.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPermissoesTable(permissoes){
+  const tbody = document.getElementById('permissoesTableBody');
+  tbody.innerHTML = PERMISSION_SECTIONS.map(s=>{
+    const p = permissoes[s.key] || {ver:false, editar:false};
+    return `<tr>
+      <td style="padding:5px 0;">${s.label}</td>
+      <td style="text-align:center;"><input type="checkbox" data-key="${s.key}" data-field="ver" ${p.ver?'checked':''}></td>
+      <td style="text-align:center;"><input type="checkbox" data-key="${s.key}" data-field="editar" ${p.editar?'checked':''}></td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      if(cb.dataset.field==='editar' && cb.checked){
+        const verCb = tbody.querySelector(`input[data-key="${cb.dataset.key}"][data-field="ver"]`);
+        if(verCb) verCb.checked = true;
+      }
+    });
+  });
+}
+function togglePermissoesBox(){
+  const role = document.getElementById('usuarioRole').value;
+  document.getElementById('permissoesBox').style.display = role==='admin' ? 'none' : '';
+}
+document.getElementById('usuarioRole').addEventListener('change', togglePermissoesBox);
+
+document.getElementById('btnNovoUsuario').onclick = ()=>{
+  if(!isAdmin()) return;
+  document.getElementById('modalUsuarioTitle').textContent='Novo usuário';
+  document.getElementById('usuarioId').value='';
+  document.getElementById('usuarioEmail').value='';
+  document.getElementById('usuarioRole').value='cadastrador';
+  togglePermissoesBox();
+  renderPermissoesTable(blankPermissoes());
+  openModal('overlayUsuario');
+};
+function editarUsuario(id){
+  if(!isAdmin()) return;
+  const u = DB.usuarios.find(x=>x.id===id); if(!u) return;
+  document.getElementById('modalUsuarioTitle').textContent='Editar usuário';
+  document.getElementById('usuarioId').value=u.id;
+  document.getElementById('usuarioEmail').value=u.email;
+  document.getElementById('usuarioRole').value=u.role;
+  togglePermissoesBox();
+  renderPermissoesTable(u.permissoes || blankPermissoes());
+  openModal('overlayUsuario');
+}
+function salvarUsuario(){
+  if(!isAdmin()) return;
+  const email = document.getElementById('usuarioEmail').value.trim().toLowerCase();
+  if(!email || !email.includes('@')){ toast('Informe um e-mail válido'); return; }
+  const id = document.getElementById('usuarioId').value;
+  const role = document.getElementById('usuarioRole').value;
+  const jaExiste = DB.usuarios.find(u=>u.email.toLowerCase()===email && u.id!==id);
+  if(jaExiste){ toast('Já existe um usuário com esse e-mail'); return; }
+  const permissoes = blankPermissoes();
+  if(role!=='admin'){
+    document.querySelectorAll('#permissoesTableBody input[type=checkbox]').forEach(cb=>{
+      permissoes[cb.dataset.key][cb.dataset.field] = cb.checked;
+    });
+  }
+  const data = { email, role, permissoes };
+  if(id){ Object.assign(DB.usuarios.find(u=>u.id===id), data); }
+  else{ DB.usuarios.push({id:uid(), ...data}); }
+  save('usuarios').then(()=>{ closeModal('overlayUsuario'); toast('Usuário salvo'); resolveCurrentUser(); renderAll(); });
+}
+function excluirUsuario(id){
+  if(!isAdmin()) return;
+  const u = DB.usuarios.find(x=>x.id===id);
+  if(u && (window.currentAuthEmail||'').toLowerCase()===u.email.toLowerCase()){
+    toast('Você não pode excluir seu próprio usuário'); return;
+  }
+  DB.usuarios = DB.usuarios.filter(x=>x.id!==id);
+  save('usuarios').then(()=>{ toast('Usuário excluído'); renderAll(); });
 }
 
 /* ---------- MODAL HELPERS ---------- */
@@ -1061,6 +1364,7 @@ document.getElementById('btnLogout').addEventListener('click', ()=>{
         if(user){
           overlay.classList.remove('active');
           document.getElementById('userEmailLabel').textContent = user.email;
+          window.currentAuthEmail = (user.email || '').toLowerCase();
           if(window.appStart) window.appStart();
         }else{
           overlay.classList.add('active');
