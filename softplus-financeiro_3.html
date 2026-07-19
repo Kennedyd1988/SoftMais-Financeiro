@@ -281,6 +281,12 @@
       <select id="filtroStatus"><option value="">Todos os status</option><option value="Pendente">Pendente</option><option value="Pago">Pago/Recebido</option></select>
       <select id="filtroConta"><option value="">Todas as contas</option></select>
     </div>
+    <div class="filters" id="ieLancamentos">
+      <button class="btn btn-ghost btn-sm" onclick="baixarModelo('lancamentos')">⬇ Baixar modelo</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarTabela('lancamentos')">⬆ Exportar</button>
+      <button class="btn btn-ghost btn-sm" id="btnImportarLancamentos" onclick="document.getElementById('fileLancamentos').click()">📄 Importar</button>
+      <input type="file" id="fileLancamentos" accept=".csv" style="display:none" onchange="importarArquivo('lancamentos', this)">
+    </div>
 
     <div class="card table-scroll" style="padding:0;">
       <table id="lancamentosTable">
@@ -288,6 +294,7 @@
         <tbody></tbody>
       </table>
     </div>
+    <div id="pagLancamentos"></div>
   </section>
 
   <!-- CONTRATOS -->
@@ -299,12 +306,19 @@
       </div>
       <button class="btn btn-primary" id="btnNovoContrato">+ Novo contrato</button>
     </div>
+    <div class="filters" id="ieContratos">
+      <button class="btn btn-ghost btn-sm" onclick="baixarModelo('contratos')">⬇ Baixar modelo</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarTabela('contratos')">⬆ Exportar</button>
+      <button class="btn btn-ghost btn-sm" id="btnImportarContratos" onclick="document.getElementById('fileContratos').click()">📄 Importar</button>
+      <input type="file" id="fileContratos" accept=".csv" style="display:none" onchange="importarArquivo('contratos', this)">
+    </div>
     <div class="card table-scroll" style="padding:0;">
       <table id="contratosTable">
         <thead><tr><th>Cliente</th><th>Objeto</th><th>Conta</th><th>Vencimento</th><th>Vigência</th><th>Status</th><th style="text-align:right">Mensalidade</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
+    <div id="pagContratos"></div>
   </section>
 
   <!-- CLIENTES -->
@@ -316,12 +330,19 @@
       </div>
       <button class="btn btn-primary" id="btnNovoCliente">+ Novo cliente</button>
     </div>
+    <div class="filters" id="ieClientes">
+      <button class="btn btn-ghost btn-sm" onclick="baixarModelo('clientes')">⬇ Baixar modelo</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarTabela('clientes')">⬆ Exportar</button>
+      <button class="btn btn-ghost btn-sm" id="btnImportarClientes" onclick="document.getElementById('fileClientes').click()">📄 Importar</button>
+      <input type="file" id="fileClientes" accept=".csv" style="display:none" onchange="importarArquivo('clientes', this)">
+    </div>
     <div class="card table-scroll" style="padding:0;">
       <table id="clientesTable">
         <thead><tr><th>Nome</th><th>CNPJ</th><th>Contato</th><th>Contratos ativos</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
+    <div id="pagClientes"></div>
   </section>
 
   <!-- MODELOS RECORRENTES -->
@@ -333,12 +354,19 @@
       </div>
       <button class="btn btn-primary" id="btnNovoModelo">+ Novo modelo</button>
     </div>
+    <div class="filters" id="ieModelos">
+      <button class="btn btn-ghost btn-sm" onclick="baixarModelo('modelos')">⬇ Baixar modelo</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarTabela('modelos')">⬆ Exportar</button>
+      <button class="btn btn-ghost btn-sm" id="btnImportarModelos" onclick="document.getElementById('fileModelos').click()">📄 Importar</button>
+      <input type="file" id="fileModelos" accept=".csv" style="display:none" onchange="importarArquivo('modelos', this)">
+    </div>
     <div class="card table-scroll" style="padding:0;">
       <table id="modelosTable">
         <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Conta</th><th>Cliente/Contrato</th><th>Dia venc.</th><th style="text-align:right">Valor</th><th>Ativo</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
+    <div id="pagModelos"></div>
   </section>
 
   <!-- RELATORIOS -->
@@ -386,12 +414,19 @@
       </div>
       <button class="btn btn-primary" id="btnNovaConta">+ Nova conta</button>
     </div>
+    <div class="filters" id="ieContas">
+      <button class="btn btn-ghost btn-sm" onclick="baixarModelo('contas')">⬇ Baixar modelo</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarTabela('contas')">⬆ Exportar</button>
+      <button class="btn btn-ghost btn-sm" id="btnImportarContas" onclick="document.getElementById('fileContas').click()">📄 Importar</button>
+      <input type="file" id="fileContas" accept=".csv" style="display:none" onchange="importarArquivo('contas', this)">
+    </div>
     <div class="card table-scroll" style="padding:0;">
       <table id="contasTable">
         <thead><tr><th>Nome</th><th>Observações</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
+    <div id="pagContas"></div>
   </section>
 
   <!-- USUARIOS (ADMIN ONLY) -->
@@ -409,6 +444,7 @@
         <tbody></tbody>
       </table>
     </div>
+    <div id="pagUsuarios"></div>
     <p style="font-size:12px; color:var(--text-faint); margin-top:10px;">
       O e-mail precisa já existir em Authentication → Users no console do Firebase. Cadastrar aqui só define o que a pessoa vê dentro do app — não cria o login dela.
     </p>
@@ -608,8 +644,9 @@ function resolveCurrentUser(){
   if(!email) return;
   if(DB.usuarios.length===0 && !window._usuariosSeeded){
     window._usuariosSeeded = true;
-    DB.usuarios = [{id:uid(), email, role:'admin', permissoes:blankPermissoes()}];
-    save('usuarios');
+    const admin = {id:uid(), email, role:'admin', permissoes:blankPermissoes()};
+    DB.usuarios = [admin];
+    saveRecord('usuarios', admin);
   }
   currentUser = DB.usuarios.find(u=>(u.email||'').toLowerCase()===email) || null;
   const navU = document.getElementById('navUsuarios');
@@ -628,6 +665,35 @@ function toast(msg){
   clearTimeout(window._toastTimer); window._toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
 }
 
+/* ---------- PAGINAÇÃO ---------- */
+const PAGE_SIZE = 25;
+const pageState = { lancamentos:1, contratos:1, clientes:1, modelos:1, contas:1, usuarios:1 };
+function paginate(list, key){
+  const total = list.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if(!pageState[key] || pageState[key] < 1) pageState[key] = 1;
+  if(pageState[key] > totalPages) pageState[key] = totalPages;
+  const start = (pageState[key]-1) * PAGE_SIZE;
+  return { pageItems: list.slice(start, start+PAGE_SIZE), totalPages, currentPage: pageState[key], total };
+}
+function renderPagination(containerId, key, totalPages, currentPage, total){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  if(total <= PAGE_SIZE){ el.innerHTML=''; return; }
+  el.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:12px 4px; font-size:12.5px; color:var(--text-dim);">
+      <span>${total} registros — página ${currentPage} de ${totalPages}</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-sm" ${currentPage<=1?'disabled':''} onclick="changePage('${key}', -1)">‹ Anterior</button>
+        <button class="btn btn-sm" ${currentPage>=totalPages?'disabled':''} onclick="changePage('${key}', 1)">Próxima ›</button>
+      </div>
+    </div>`;
+}
+function changePage(key, delta){
+  pageState[key] = (pageState[key]||1) + delta;
+  renderAll();
+}
+
 const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios','contas'];
 const loadedTables = new Set();
 
@@ -643,8 +709,22 @@ function seedCategoriasIfNeeded(){
       {id:uid(), nome:'Serviços de terceiros', tipo:'saida'},
       {id:uid(), nome:'Despesa variável', tipo:'saida'}
     ];
-    save('categorias');
+    saveBatch('categorias', DB.categorias);
   }
+}
+
+async function migrateTableIfNeeded(key){
+  if(window['_migrated_'+key]) return;
+  window['_migrated_'+key] = true;
+  try{
+    const hasNew = await window.fbCollectionHasAny(key);
+    if(hasNew) return;
+    const oldItems = await window.fbGetOldTable(key);
+    if(!oldItems || oldItems.length===0) return;
+    const records = oldItems.map(it => (it && it.id) ? it : {...it, id: uid()});
+    await window.fbBatchSave(key, records);
+    console.log(`Migração: ${records.length} registro(s) de "${key}" migrados para o novo formato.`);
+  }catch(e){ console.error('Erro na migração de '+key, e); }
 }
 
 function appStart(){
@@ -662,14 +742,26 @@ function appStart(){
       }
       renderAll();
     });
+    migrateTableIfNeeded(k);
   });
 }
 window.appStart = appStart;
 
-async function save(key){
+async function saveRecord(key, record){
   try{
-    await window.fbSave(key, DB[key]);
+    await window.fbSaveRecord(key, record);
   }catch(e){ console.error('Erro ao salvar', key, e); toast('Erro ao salvar dados. Verifique sua conexão.'); }
+}
+async function deleteRecord(key, id){
+  try{
+    await window.fbDeleteRecord(key, id);
+  }catch(e){ console.error('Erro ao excluir', key, e); toast('Erro ao excluir. Verifique sua conexão.'); }
+}
+async function saveBatch(key, records){
+  if(!records || records.length===0) return;
+  try{
+    await window.fbBatchSave(key, records);
+  }catch(e){ console.error('Erro ao salvar em lote', key, e); toast('Erro ao salvar dados. Verifique sua conexão.'); }
 }
 
 function catName(id){ const c=DB.categorias.find(x=>x.id===id); return c?c.nome:'—'; }
@@ -677,6 +769,268 @@ function catImpostoId(){ const c=DB.categorias.find(x=>x.nome==='Imposto'); retu
 function clienteNome(id){ const c=DB.clientes.find(x=>x.id===id); return c?c.nome:'—'; }
 function contratoLabel(id){ const c=DB.contratos.find(x=>x.id===id); if(!c) return '—'; return `${clienteNome(c.clienteId)} — ${c.objeto}`; }
 function contaNome(id){ const c=DB.contas.find(x=>x.id===id); return c?c.nome:'—'; }
+
+/* ---------- CSV ENGINE (Exportar / Importar / Modelo) ---------- */
+function csvEscape(v){
+  if(v===null || v===undefined) return '';
+  const s = String(v);
+  if(/[",\n;]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+function rowsToCSV(headers, rows){
+  const lines = [headers.map(csvEscape).join(',')];
+  rows.forEach(r=>{ lines.push(headers.map(h=>csvEscape(r[h])).join(',')); });
+  return '\uFEFF' + lines.join('\r\n');
+}
+function parseCSV(text){
+  text = text.replace(/^\uFEFF/, '');
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c === '"'){ if(text[i+1] === '"'){ field+='"'; i++; } else { inQuotes=false; } }
+      else field += c;
+    }else{
+      if(c === '"') inQuotes = true;
+      else if(c === ','){ row.push(field); field=''; }
+      else if(c === '\r'){ /* skip, handled by \n */ }
+      else if(c === '\n'){ row.push(field); field=''; rows.push(row); row=[]; }
+      else field += c;
+    }
+  }
+  if(field!=='' || row.length){ row.push(field); rows.push(row); }
+  if(rows.length===0) return [];
+  const headers = rows[0].map(h=>h.trim());
+  return rows.slice(1).filter(r=>r.some(x=>(x||'').trim()!=='')).map(r=>{
+    const obj={};
+    headers.forEach((h,idx)=>{ obj[h]=r[idx]!==undefined?r[idx]:''; });
+    return obj;
+  });
+}
+function downloadCSV(filename, headers, rows){
+  const csv = rowsToCSV(headers, rows);
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function findClienteId(nome){
+  if(!nome) return null;
+  const n = nome.trim().toLowerCase();
+  const c = DB.clientes.find(x=>x.nome.trim().toLowerCase()===n);
+  return c ? c.id : undefined;
+}
+function findContaId(nome){
+  if(!nome) return null;
+  const n = nome.trim().toLowerCase();
+  const c = DB.contas.find(x=>x.nome.trim().toLowerCase()===n);
+  return c ? c.id : undefined;
+}
+function findContratoId(label){
+  if(!label) return null;
+  const n = label.trim().toLowerCase();
+  const c = DB.contratos.find(x=>contratoLabel(x.id).trim().toLowerCase()===n);
+  return c ? c.id : undefined;
+}
+function findCategoriaId(nome, tipo){
+  if(!nome) return undefined;
+  const n = nome.trim().toLowerCase();
+  const c = DB.categorias.find(x=>x.nome.trim().toLowerCase()===n && x.tipo===tipo);
+  return c ? c.id : undefined;
+}
+
+const IMPORT_EXPORT_CONFIG = {
+  clientes: {
+    label:'Clientes',
+    headers:['ID','Nome','CNPJ','Contato','Observacoes'],
+    example:{ID:'', Nome:'Prefeitura Municipal de Exemplo', CNPJ:'00.000.000/0000-00', Contato:'Fulano - (00) 00000-0000', Observacoes:''},
+    toRow(c){ return {ID:c.id, Nome:c.nome, CNPJ:c.cnpj||'', Contato:c.contato||'', Observacoes:c.obs||''}; },
+    fromRow(row){
+      const nome=(row.Nome||'').trim();
+      if(!nome) return {error:'coluna Nome vazia'};
+      return {id:(row.ID||'').trim(), record:{nome, cnpj:(row.CNPJ||'').trim(), contato:(row.Contato||'').trim(), obs:(row.Observacoes||'').trim()}};
+    }
+  },
+  contas: {
+    label:'Contas',
+    headers:['ID','Nome','Observacoes'],
+    example:{ID:'', Nome:'Caixa principal', Observacoes:''},
+    toRow(c){ return {ID:c.id, Nome:c.nome, Observacoes:c.obs||''}; },
+    fromRow(row){
+      const nome=(row.Nome||'').trim();
+      if(!nome) return {error:'coluna Nome vazia'};
+      return {id:(row.ID||'').trim(), record:{nome, obs:(row.Observacoes||'').trim()}};
+    }
+  },
+  contratos: {
+    label:'Contratos',
+    headers:['ID','Cliente','Objeto','ValorMensal','DiaVencimento','DataInicio','DataFim','Status','Conta','Observacoes'],
+    example:{ID:'', Cliente:'Prefeitura Municipal de Exemplo', Objeto:'Sistema de gestão de tributos', ValorMensal:'1500.00', DiaVencimento:'10', DataInicio:'2026-01-01', DataFim:'', Status:'Ativo', Conta:'', Observacoes:''},
+    toRow(c){ return {ID:c.id, Cliente:clienteNome(c.clienteId), Objeto:c.objeto, ValorMensal:c.valorMensal, DiaVencimento:c.diaVencimento, DataInicio:c.dataInicio, DataFim:c.dataFim||'', Status:c.status, Conta:c.contaId?contaNome(c.contaId):'', Observacoes:c.obs||''}; },
+    fromRow(row){
+      const objeto=(row.Objeto||'').trim();
+      const clienteNomeRaw=(row.Cliente||'').trim();
+      const valor=parseFloat((row.ValorMensal||'').replace(',','.'));
+      const dia=parseInt(row.DiaVencimento);
+      const dataInicio=(row.DataInicio||'').trim();
+      if(!objeto) return {error:'coluna Objeto vazia'};
+      if(!clienteNomeRaw) return {error:'coluna Cliente vazia'};
+      const clienteId = findClienteId(clienteNomeRaw);
+      if(clienteId===undefined) return {error:`cliente "${clienteNomeRaw}" não encontrado`};
+      if(!valor || valor<=0) return {error:'ValorMensal inválido'};
+      if(!dia || dia<1 || dia>28) return {error:'DiaVencimento inválido (use 1 a 28)'};
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) return {error:'DataInicio inválida (use AAAA-MM-DD)'};
+      let status=(row.Status||'Ativo').trim();
+      if(!['Ativo','Suspenso','Encerrado'].includes(status)) status='Ativo';
+      const contaNomeRaw=(row.Conta||'').trim();
+      let contaId=null, warning=null;
+      if(contaNomeRaw){ const found=findContaId(contaNomeRaw); if(found===undefined) warning=`conta "${contaNomeRaw}" não encontrada, deixada em branco`; else contaId=found; }
+      const dataFim=(row.DataFim||'').trim();
+      return {id:(row.ID||'').trim(), warning, record:{clienteId, objeto, valorMensal:valor, diaVencimento:dia, dataInicio, dataFim:dataFim||null, status, contaId, obs:(row.Observacoes||'').trim()}};
+    }
+  },
+  modelos: {
+    label:'Modelos recorrentes',
+    headers:['ID','Descricao','Tipo','Categoria','Contrato','Conta','Valor','Dia','Ativo'],
+    example:{ID:'', Descricao:'Mensalidade Prefeitura Exemplo', Tipo:'entrada', Categoria:'Mensalidade de contrato', Contrato:'', Conta:'', Valor:'1500.00', Dia:'10', Ativo:'Sim'},
+    toRow(m){ return {ID:m.id, Descricao:m.descricao, Tipo:m.tipo, Categoria:catName(m.categoriaId), Contrato:m.contratoId?contratoLabel(m.contratoId):'', Conta:m.contaId?contaNome(m.contaId):'', Valor:m.valor, Dia:m.dia, Ativo:m.ativo?'Sim':'Não'}; },
+    fromRow(row){
+      const descricao=(row.Descricao||'').trim();
+      const tipo=(row.Tipo||'').trim().toLowerCase();
+      const categoriaNomeRaw=(row.Categoria||'').trim();
+      const valor=parseFloat((row.Valor||'').replace(',','.'));
+      const dia=parseInt(row.Dia);
+      if(!descricao) return {error:'coluna Descricao vazia'};
+      if(tipo!=='entrada' && tipo!=='saida') return {error:'Tipo deve ser "entrada" ou "saida"'};
+      const permKey = tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas';
+      if(!canEdit(permKey)) return {error:`sem permissão para importar modelos de ${tipo}`};
+      if(!categoriaNomeRaw) return {error:'coluna Categoria vazia'};
+      const categoriaId = findCategoriaId(categoriaNomeRaw, tipo);
+      if(categoriaId===undefined) return {error:`categoria "${categoriaNomeRaw}" não encontrada para o tipo ${tipo}`};
+      if(!valor || valor<=0) return {error:'Valor inválido'};
+      if(!dia || dia<1 || dia>28) return {error:'Dia inválido (use 1 a 28)'};
+      let warning=null;
+      const contratoRaw=(row.Contrato||'').trim();
+      let contratoId=null;
+      if(contratoRaw){ const found=findContratoId(contratoRaw); if(found===undefined) warning=(warning?warning+'; ':'')+`contrato "${contratoRaw}" não encontrado`; else contratoId=found; }
+      const contaRaw=(row.Conta||'').trim();
+      let contaId=null;
+      if(contaRaw){ const found=findContaId(contaRaw); if(found===undefined) warning=(warning?warning+'; ':'')+`conta "${contaRaw}" não encontrada`; else contaId=found; }
+      const ativo = (row.Ativo||'').trim()==='' || /^(sim|s|true|1)$/i.test((row.Ativo||'').trim());
+      return {id:(row.ID||'').trim(), warning, record:{descricao, tipo, categoriaId, contratoId, contaId, valor, dia, ativo}};
+    }
+  },
+  lancamentos: {
+    label:'Lançamentos',
+    headers:['ID','Descricao','Tipo','Categoria','Contrato','Conta','Valor','DataPrevista','Status','DataPagamento'],
+    example:{ID:'', Descricao:'Mensalidade Prefeitura Exemplo - Julho/2026', Tipo:'entrada', Categoria:'Mensalidade de contrato', Contrato:'', Conta:'', Valor:'1500.00', DataPrevista:'2026-07-10', Status:'Pendente', DataPagamento:''},
+    toRow(l){ return {ID:l.id, Descricao:l.descricao, Tipo:l.tipo, Categoria:catName(l.categoriaId), Contrato:l.contratoId?contratoLabel(l.contratoId):'', Conta:l.contaId?contaNome(l.contaId):'', Valor:l.valor, DataPrevista:l.dataPrevista, Status:l.status, DataPagamento:l.dataPagamento||''}; },
+    fromRow(row){
+      const descricao=(row.Descricao||'').trim();
+      const tipo=(row.Tipo||'').trim().toLowerCase();
+      const categoriaNomeRaw=(row.Categoria||'').trim();
+      const valor=parseFloat((row.Valor||'').replace(',','.'));
+      const dataPrevista=(row.DataPrevista||'').trim();
+      if(!descricao) return {error:'coluna Descricao vazia'};
+      if(tipo!=='entrada' && tipo!=='saida') return {error:'Tipo deve ser "entrada" ou "saida"'};
+      const permKey = tipo==='entrada' ? 'lancEntradas' : 'lancSaidas';
+      if(!canEdit(permKey)) return {error:`sem permissão para importar lançamentos de ${tipo}`};
+      if(!categoriaNomeRaw) return {error:'coluna Categoria vazia'};
+      const categoriaId = findCategoriaId(categoriaNomeRaw, tipo);
+      if(categoriaId===undefined) return {error:`categoria "${categoriaNomeRaw}" não encontrada para o tipo ${tipo}`};
+      if(!valor || valor<=0) return {error:'Valor inválido'};
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(dataPrevista)) return {error:'DataPrevista inválida (use AAAA-MM-DD)'};
+      let warning=null;
+      const contratoRaw=(row.Contrato||'').trim();
+      let contratoId=null;
+      if(contratoRaw){ const found=findContratoId(contratoRaw); if(found===undefined) warning=(warning?warning+'; ':'')+`contrato "${contratoRaw}" não encontrado`; else contratoId=found; }
+      const contaRaw=(row.Conta||'').trim();
+      let contaId=null;
+      if(contaRaw){ const found=findContaId(contaRaw); if(found===undefined) warning=(warning?warning+'; ':'')+`conta "${contaRaw}" não encontrada`; else contaId=found; }
+      let status=(row.Status||'Pendente').trim();
+      if(!['Pendente','Pago'].includes(status)) status='Pendente';
+      const dataPagamento=(row.DataPagamento||'').trim();
+      return {id:(row.ID||'').trim(), warning, record:{descricao, tipo, categoriaId, contratoId, contaId, valor, dataPrevista, status, dataPagamento: dataPagamento||null, modeloId:null}};
+    }
+  }
+};
+
+function canViewTable(key){
+  switch(key){
+    case 'clientes': return canView('clientes');
+    case 'contratos': return canView('contratos');
+    case 'contas': return isAdmin();
+    case 'modelos': return canView('modelosEntradas') || canView('modelosSaidas');
+    case 'lancamentos': return canView('lancEntradas') || canView('lancSaidas');
+    default: return false;
+  }
+}
+function canEditTable(key){
+  switch(key){
+    case 'clientes': return canEdit('clientes');
+    case 'contratos': return canEdit('contratos');
+    case 'contas': return isAdmin();
+    case 'modelos': return canEdit('modelosEntradas') || canEdit('modelosSaidas');
+    case 'lancamentos': return canEdit('lancEntradas') || canEdit('lancSaidas');
+    default: return false;
+  }
+}
+function getExportList(key){
+  if(key==='modelos') return DB.modelos.filter(m => (m.tipo==='entrada' && canView('modelosEntradas')) || (m.tipo==='saida' && canView('modelosSaidas')));
+  if(key==='lancamentos') return DB.lancamentos.filter(l => (l.tipo==='entrada' && canView('lancEntradas')) || (l.tipo==='saida' && canView('lancSaidas')));
+  return DB[key];
+}
+function exportarTabela(key){
+  if(!canViewTable(key)) return;
+  const cfg = IMPORT_EXPORT_CONFIG[key];
+  const rows = getExportList(key).map(cfg.toRow);
+  downloadCSV(`softplus_${key}.csv`, cfg.headers, rows);
+  toast(`${cfg.label} exportado(s)`);
+}
+function baixarModelo(key){
+  if(!canViewTable(key)) return;
+  const cfg = IMPORT_EXPORT_CONFIG[key];
+  downloadCSV(`modelo_${key}.csv`, cfg.headers, [cfg.example]);
+}
+function importarArquivo(key, inputEl){
+  if(!canEditTable(key)) { toast('Sem permissão para importar'); inputEl.value=''; return; }
+  const cfg = IMPORT_EXPORT_CONFIG[key];
+  const file = inputEl.files[0];
+  if(!file){ return; }
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const rows = parseCSV(e.target.result);
+    let created=0, updated=0;
+    const errors=[], warnings=[];
+    const touched = [];
+    rows.forEach((row, idx)=>{
+      const result = cfg.fromRow(row);
+      if(result.error){ errors.push(`Linha ${idx+2}: ${result.error}`); return; }
+      if(result.warning) warnings.push(`Linha ${idx+2}: ${result.warning}`);
+      const id = result.id;
+      const existing = id ? DB[key].find(x=>x.id===id) : null;
+      if(existing){ Object.assign(existing, result.record); updated++; touched.push(existing); }
+      else{ const rec = {id: uid(), ...result.record}; DB[key].push(rec); created++; touched.push(rec); }
+    });
+    saveBatch(key, touched).then(()=>{
+      renderAll();
+      let msg = `${cfg.label}: ${created} criado(s), ${updated} atualizado(s)`;
+      if(errors.length) msg += `, ${errors.length} com erro`;
+      toast(msg);
+      if(errors.length || warnings.length){
+        alert(`Importação de ${cfg.label} concluída.\n${created} criado(s), ${updated} atualizado(s).\n\n`
+          + (errors.length?`Erros (${errors.length}) — linhas não importadas:\n${errors.join('\n')}\n\n`:'')
+          + (warnings.length?`Avisos (${warnings.length}) — importadas com campo em branco:\n${warnings.join('\n')}`:''));
+      }
+    });
+  };
+  reader.readAsText(file, 'UTF-8');
+  inputEl.value = '';
+}
 
 /* ---------- NAV ---------- */
 function viewIsAllowed(view){
@@ -872,7 +1226,7 @@ function confirmarLancamento(id){
   const key = l.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas';
   if(!canEdit(key) && !canEdit('painelGeral')){ toast('Sem permissão para editar'); return; }
   l.status='Pago'; l.dataPagamento=todayISO();
-  save('lancamentos').then(()=>{ toast('Lançamento confirmado'); renderAll(); });
+  saveRecord('lancamentos', l).then(()=>{ toast('Lançamento confirmado'); renderAll(); });
 }
 
 /* ---------- GERAR LANÇAMENTOS DO MÊS ---------- */
@@ -881,20 +1235,22 @@ document.getElementById('btnGerarMes').onclick = async ()=>{
   const comp = currentComp();
   const [ano,mes] = comp.split('-');
   const ativos = DB.modelos.filter(m=>m.ativo);
-  let gerados = 0;
+  const novos = [];
   ativos.forEach(m=>{
     const jaExiste = DB.lancamentos.some(l=>l.modeloId===m.id && compOf(l.dataPrevista)===comp);
     if(jaExiste) return;
     const dia = String(m.dia).padStart(2,'0');
-    DB.lancamentos.push({
+    const novo = {
       id:uid(), tipo:m.tipo, categoriaId:m.categoriaId, contratoId:m.contratoId||null,
       contaId:m.contaId||null,
       descricao:m.descricao, valor:m.valor, dataPrevista:`${ano}-${mes}-${dia}`,
       status:'Pendente', dataPagamento:null, modeloId:m.id
-    });
-    gerados++;
+    };
+    DB.lancamentos.push(novo);
+    novos.push(novo);
   });
-  await save('lancamentos');
+  await saveBatch('lancamentos', novos);
+  const gerados = novos.length;
   toast(gerados>0 ? `${gerados} lançamento(s) gerado(s) para ${monthLabel(comp)}` : 'Nenhum lançamento novo — já gerados ou sem modelos ativos');
   renderAll();
 };
@@ -949,6 +1305,7 @@ function renderLancamentos(){
 
   document.getElementById('btnNovoLancamento').style.display = (eEntradas || eSaidas) ? '' : 'none';
   document.getElementById('btnGerarMes').style.display = (isAdmin() || (eEntradas && eSaidas)) ? '' : 'none';
+  document.getElementById('btnImportarLancamentos').style.display = (eEntradas || eSaidas) ? '' : 'none';
 
   let list = [...DB.lancamentos].sort((a,b)=>b.dataPrevista.localeCompare(a.dataPrevista));
   list = list.filter(l => (l.tipo==='entrada' && vEntradas) || (l.tipo==='saida' && vSaidas));
@@ -962,9 +1319,12 @@ function renderLancamentos(){
   const tbody = document.querySelector('#lancamentosTable tbody');
   if(list.length===0){
     tbody.innerHTML = `<tr><td colspan="9" class="empty"><b>Nenhum lançamento encontrado</b>Gere os lançamentos do mês ou adicione um lançamento manual.</td></tr>`;
+    document.getElementById('pagLancamentos').innerHTML = '';
     return;
   }
-  tbody.innerHTML = list.map(l=>{
+  const { pageItems, totalPages, currentPage, total } = paginate(list, 'lancamentos');
+  renderPagination('pagLancamentos', 'lancamentos', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(l=>{
     const atrasado = l.status==='Pendente' && l.dataPrevista<hoje;
     const statusBadge = l.status==='Pago'
       ? `<span class="badge badge-green">${l.tipo==='entrada'?'Recebido':'Pago'}</span>`
@@ -987,14 +1347,14 @@ function renderLancamentos(){
   }).join('');
 }
 ['filtroMes','filtroAno','filtroTipo','filtroStatus','filtroConta'].forEach(id=>{
-  document.getElementById(id).addEventListener('change', renderLancamentos);
+  document.getElementById(id).addEventListener('change', ()=>{ pageState.lancamentos = 1; renderLancamentos(); });
 });
 
 function excluirLancamento(id){
   const l = DB.lancamentos.find(x=>x.id===id);
   if(l){ const key = l.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas'; if(!canEdit(key)){ toast('Sem permissão para excluir'); return; } }
   DB.lancamentos = DB.lancamentos.filter(x=>x.id!==id);
-  save('lancamentos').then(()=>{ toast('Lançamento excluído'); renderAll(); });
+  deleteRecord('lancamentos', id).then(()=>{ toast('Lançamento excluído'); renderAll(); });
 }
 
 document.getElementById('btnNovoLancamento').onclick = ()=>{
@@ -1022,26 +1382,31 @@ function salvarLancamento(){
   if(!categoriaId){ toast('Selecione a categoria'); return; }
   if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
   if(!data){ toast('Informe a data prevista'); return; }
-  DB.lancamentos.push({
+  const novo = {
     id:uid(), tipo:document.getElementById('lancTipo').value,
     categoriaId,
     contratoId:document.getElementById('lancContrato').value || null,
     contaId:document.getElementById('lancConta').value || null,
     descricao, valor, dataPrevista:data, status:'Pendente', dataPagamento:null, modeloId:null
-  });
-  save('lancamentos').then(()=>{ closeModal('overlayLancamento'); toast('Lançamento adicionado'); renderAll(); });
+  };
+  DB.lancamentos.push(novo);
+  saveRecord('lancamentos', novo).then(()=>{ closeModal('overlayLancamento'); toast('Lançamento adicionado'); renderAll(); });
 }
 
 /* ---------- CONTRATOS ---------- */
 function renderContratos(){
   const podeEditar = canEdit('contratos');
   document.getElementById('btnNovoContrato').style.display = podeEditar ? '' : 'none';
+  document.getElementById('btnImportarContratos').style.display = podeEditar ? '' : 'none';
   const tbody = document.querySelector('#contratosTable tbody');
   if(DB.contratos.length===0){
     tbody.innerHTML = `<tr><td colspan="8" class="empty"><b>Nenhum contrato cadastrado</b>Adicione o primeiro contrato de locação de software.</td></tr>`;
+    document.getElementById('pagContratos').innerHTML = '';
     return;
   }
-  tbody.innerHTML = DB.contratos.map(c=>{
+  const { pageItems, totalPages, currentPage, total } = paginate(DB.contratos, 'contratos');
+  renderPagination('pagContratos', 'contratos', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(c=>{
     const badgeClass = c.status==='Ativo'?'badge-green':(c.status==='Suspenso'?'badge-amber':'badge-gray');
     return `<tr>
       <td>${clienteNome(c.clienteId)}</td>
@@ -1111,28 +1476,33 @@ function salvarContrato(){
     contaId:document.getElementById('contratoConta').value || null,
     obs:document.getElementById('contratoObs').value
   };
-  if(id){ Object.assign(DB.contratos.find(c=>c.id===id), data); }
-  else{ DB.contratos.push({id:uid(), ...data}); }
-  save('contratos').then(()=>{ closeModal('overlayContrato'); toast('Contrato salvo'); renderAll(); });
+  let rec;
+  if(id){ rec = DB.contratos.find(c=>c.id===id); Object.assign(rec, data); }
+  else{ rec = {id:uid(), ...data}; DB.contratos.push(rec); }
+  saveRecord('contratos', rec).then(()=>{ closeModal('overlayContrato'); toast('Contrato salvo'); renderAll(); });
 }
 function excluirContrato(id){
   if(!canEdit('contratos')) return;
   const vinculado = DB.lancamentos.some(l=>l.contratoId===id) || DB.modelos.some(m=>m.contratoId===id);
   if(vinculado){ toast('Não é possível excluir: há lançamentos ou modelos vinculados a este contrato'); return; }
   DB.contratos = DB.contratos.filter(c=>c.id!==id);
-  save('contratos').then(()=>{ toast('Contrato excluído'); renderAll(); });
+  deleteRecord('contratos', id).then(()=>{ toast('Contrato excluído'); renderAll(); });
 }
 
 /* ---------- CLIENTES ---------- */
 function renderClientes(){
   const podeEditar = canEdit('clientes');
   document.getElementById('btnNovoCliente').style.display = podeEditar ? '' : 'none';
+  document.getElementById('btnImportarClientes').style.display = podeEditar ? '' : 'none';
   const tbody = document.querySelector('#clientesTable tbody');
   if(DB.clientes.length===0){
     tbody.innerHTML = `<tr><td colspan="5" class="empty"><b>Nenhum cliente cadastrado</b>Adicione o primeiro órgão público atendido pela SOFT+.</td></tr>`;
+    document.getElementById('pagClientes').innerHTML = '';
     return;
   }
-  tbody.innerHTML = DB.clientes.map(c=>{
+  const { pageItems, totalPages, currentPage, total } = paginate(DB.clientes, 'clientes');
+  renderPagination('pagClientes', 'clientes', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(c=>{
     const ativos = DB.contratos.filter(k=>k.clienteId===c.id && k.status==='Ativo').length;
     return `<tr>
       <td>${c.nome}</td><td>${c.cnpj||'—'}</td><td>${c.contato||'—'}</td><td>${ativos}</td>
@@ -1166,16 +1536,17 @@ function salvarCliente(){
   if(!nome){ toast('Informe o nome do cliente'); return; }
   const id = document.getElementById('clienteId').value;
   const data = { nome, cnpj:document.getElementById('clienteCnpj').value, contato:document.getElementById('clienteContato').value, obs:document.getElementById('clienteObs').value };
-  if(id){ Object.assign(DB.clientes.find(c=>c.id===id), data); }
-  else{ DB.clientes.push({id:uid(), ...data}); }
-  save('clientes').then(()=>{ closeModal('overlayCliente'); toast('Cliente salvo'); renderAll(); });
+  let rec;
+  if(id){ rec = DB.clientes.find(c=>c.id===id); Object.assign(rec, data); }
+  else{ rec = {id:uid(), ...data}; DB.clientes.push(rec); }
+  saveRecord('clientes', rec).then(()=>{ closeModal('overlayCliente'); toast('Cliente salvo'); renderAll(); });
 }
 function excluirCliente(id){
   if(!canEdit('clientes')) return;
   const vinculado = DB.contratos.some(c=>c.clienteId===id);
   if(vinculado){ toast('Não é possível excluir: há contratos vinculados a este cliente'); return; }
   DB.clientes = DB.clientes.filter(c=>c.id!==id);
-  save('clientes').then(()=>{ toast('Cliente excluído'); renderAll(); });
+  deleteRecord('clientes', id).then(()=>{ toast('Cliente excluído'); renderAll(); });
 }
 
 /* ---------- MODELOS RECORRENTES ---------- */
@@ -1183,14 +1554,18 @@ function renderModelos(){
   const vEntradas = canView('modelosEntradas'), vSaidas = canView('modelosSaidas');
   const eEntradas = canEdit('modelosEntradas'), eSaidas = canEdit('modelosSaidas');
   document.getElementById('btnNovoModelo').style.display = (eEntradas || eSaidas) ? '' : 'none';
+  document.getElementById('btnImportarModelos').style.display = (eEntradas || eSaidas) ? '' : 'none';
 
   const list = DB.modelos.filter(m => (m.tipo==='entrada' && vEntradas) || (m.tipo==='saida' && vSaidas));
   const tbody = document.querySelector('#modelosTable tbody');
   if(list.length===0){
     tbody.innerHTML = `<tr><td colspan="9" class="empty"><b>Nenhum modelo cadastrado</b>Crie modelos para as mensalidades e despesas fixas de todo mês.</td></tr>`;
+    document.getElementById('pagModelos').innerHTML = '';
     return;
   }
-  tbody.innerHTML = list.map(m=>{
+  const { pageItems, totalPages, currentPage, total } = paginate(list, 'modelos');
+  renderPagination('pagModelos', 'modelos', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(m=>{
     const podeEditarLinha = m.tipo==='entrada' ? eEntradas : eSaidas;
     return `<tr>
       <td>${m.descricao}</td>
@@ -1267,15 +1642,16 @@ function salvarModelo(){
     valor, dia,
     ativo:document.getElementById('modeloAtivo').checked
   };
-  if(id){ Object.assign(DB.modelos.find(m=>m.id===id), data); }
-  else{ DB.modelos.push({id:uid(), ...data}); }
-  save('modelos').then(()=>{ closeModal('overlayModelo'); toast('Modelo salvo'); renderAll(); });
+  let rec;
+  if(id){ rec = DB.modelos.find(m=>m.id===id); Object.assign(rec, data); }
+  else{ rec = {id:uid(), ...data}; DB.modelos.push(rec); }
+  saveRecord('modelos', rec).then(()=>{ closeModal('overlayModelo'); toast('Modelo salvo'); renderAll(); });
 }
 function excluirModelo(id){
   const m = DB.modelos.find(x=>x.id===id);
   if(m){ const key = m.tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas'; if(!canEdit(key)){ toast('Sem permissão para excluir'); return; } }
   DB.modelos = DB.modelos.filter(x=>x.id!==id);
-  save('modelos').then(()=>{ toast('Modelo excluído'); renderAll(); });
+  deleteRecord('modelos', id).then(()=>{ toast('Modelo excluído'); renderAll(); });
 }
 
 /* ---------- RELATORIOS ---------- */
@@ -1352,9 +1728,12 @@ function renderContas(){
   if(!tbody) return;
   if(DB.contas.length===0){
     tbody.innerHTML = `<tr><td colspan="3" class="empty"><b>Nenhuma conta cadastrada</b>Crie contas para dividir os lançamentos (não precisa ser bancária).</td></tr>`;
+    document.getElementById('pagContas').innerHTML = '';
     return;
   }
-  tbody.innerHTML = DB.contas.map(c=>`<tr>
+  const { pageItems, totalPages, currentPage, total } = paginate(DB.contas, 'contas');
+  renderPagination('pagContas', 'contas', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(c=>`<tr>
       <td>${c.nome}</td>
       <td style="color:var(--text-dim);">${c.obs||'—'}</td>
       <td class="row-actions">
@@ -1386,16 +1765,17 @@ function salvarConta(){
   if(!nome){ toast('Informe o nome da conta'); return; }
   const id = document.getElementById('contaId').value;
   const data = { nome, obs:document.getElementById('contaObs').value };
-  if(id){ Object.assign(DB.contas.find(c=>c.id===id), data); }
-  else{ DB.contas.push({id:uid(), ...data}); }
-  save('contas').then(()=>{ closeModal('overlayConta'); toast('Conta salva'); renderAll(); });
+  let rec;
+  if(id){ rec = DB.contas.find(c=>c.id===id); Object.assign(rec, data); }
+  else{ rec = {id:uid(), ...data}; DB.contas.push(rec); }
+  saveRecord('contas', rec).then(()=>{ closeModal('overlayConta'); toast('Conta salva'); renderAll(); });
 }
 function excluirConta(id){
   if(!isAdmin()) return;
   const vinculado = DB.contratos.some(c=>c.contaId===id) || DB.modelos.some(m=>m.contaId===id) || DB.lancamentos.some(l=>l.contaId===id);
   if(vinculado){ toast('Não é possível excluir: há contratos, modelos ou lançamentos vinculados a esta conta'); return; }
   DB.contas = DB.contas.filter(c=>c.id!==id);
-  save('contas').then(()=>{ toast('Conta excluída'); renderAll(); });
+  deleteRecord('contas', id).then(()=>{ toast('Conta excluída'); renderAll(); });
 }
 
 /* ---------- USUARIOS (ADMIN) ---------- */
@@ -1405,9 +1785,12 @@ function renderUsuarios(){
   if(!tbody) return;
   if(DB.usuarios.length===0){
     tbody.innerHTML = `<tr><td colspan="4" class="empty"><b>Nenhum usuário cadastrado</b>Adicione um cadastrador e defina o que ele pode acessar.</td></tr>`;
+    document.getElementById('pagUsuarios').innerHTML = '';
     return;
   }
-  tbody.innerHTML = DB.usuarios.map(u=>{
+  const { pageItems, totalPages, currentPage, total } = paginate(DB.usuarios, 'usuarios');
+  renderPagination('pagUsuarios', 'usuarios', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(u=>{
     const resumo = u.role==='admin' ? 'Acesso total' : PERMISSION_SECTIONS.filter(s=>{
       const p = (u.permissoes && u.permissoes[s.key]) || {};
       return p.ver || p.editar;
@@ -1485,9 +1868,10 @@ function salvarUsuario(){
     });
   }
   const data = { email, role, permissoes };
-  if(id){ Object.assign(DB.usuarios.find(u=>u.id===id), data); }
-  else{ DB.usuarios.push({id:uid(), ...data}); }
-  save('usuarios').then(()=>{ closeModal('overlayUsuario'); toast('Usuário salvo'); resolveCurrentUser(); renderAll(); });
+  let rec;
+  if(id){ rec = DB.usuarios.find(u=>u.id===id); Object.assign(rec, data); }
+  else{ rec = {id:uid(), ...data}; DB.usuarios.push(rec); }
+  saveRecord('usuarios', rec).then(()=>{ closeModal('overlayUsuario'); toast('Usuário salvo'); resolveCurrentUser(); renderAll(); });
 }
 function excluirUsuario(id){
   if(!isAdmin()) return;
@@ -1496,7 +1880,7 @@ function excluirUsuario(id){
     toast('Você não pode excluir seu próprio usuário'); return;
   }
   DB.usuarios = DB.usuarios.filter(x=>x.id!==id);
-  save('usuarios').then(()=>{ toast('Usuário excluído'); renderAll(); });
+  deleteRecord('usuarios', id).then(()=>{ toast('Usuário excluído'); renderAll(); });
 }
 
 /* ---------- MODAL HELPERS ---------- */
@@ -1555,12 +1939,43 @@ document.getElementById('btnLogout').addEventListener('click', ()=>{
 
       window.fbSignIn = function(email, pass){ return auth.signInWithEmailAndPassword(email, pass); };
       window.fbSignOut = function(){ return auth.signOut(); };
-      window.fbSave = function(key, arr){ return db.collection('softplus_tabelas').doc(key).set({ items: arr }); };
+
+      // Each "table" is now a Firestore COLLECTION with one document per record
+      // (instead of one giant document per table), so there is no 1MB document limit.
       window.fbWatch = function(key, cb){
-        return db.collection('softplus_tabelas').doc(key).onSnapshot(
-          function(snap){ cb(snap.exists ? (snap.data().items || []) : []); },
+        return db.collection(key).onSnapshot(
+          function(snap){
+            var arr = [];
+            snap.forEach(function(doc){ arr.push(doc.data()); });
+            cb(arr);
+          },
           function(err){ console.error('Firestore watch error', key, err); diag('Erro no banco de dados: ' + err.message); }
         );
+      };
+      window.fbSaveRecord = function(key, record){ return db.collection(key).doc(record.id).set(record); };
+      window.fbDeleteRecord = function(key, id){ return db.collection(key).doc(id).delete(); };
+      window.fbBatchSave = function(key, records){
+        var chunks = [];
+        for(var i=0;i<records.length;i+=400){ chunks.push(records.slice(i,i+400)); }
+        var p = Promise.resolve();
+        chunks.forEach(function(chunk){
+          p = p.then(function(){
+            var batch = db.batch();
+            chunk.forEach(function(r){ batch.set(db.collection(key).doc(r.id), r); });
+            return batch.commit();
+          });
+        });
+        return p;
+      };
+      // One-time read of the OLD single-document format, used only to migrate
+      // pre-existing data into the new per-record collections.
+      window.fbGetOldTable = function(key){
+        return db.collection('softplus_tabelas').doc(key).get().then(function(snap){
+          return snap.exists ? (snap.data().items || []) : [];
+        });
+      };
+      window.fbCollectionHasAny = function(key){
+        return db.collection(key).limit(1).get().then(function(snap){ return !snap.empty; });
       };
 
       auth.onAuthStateChanged(function(user){
