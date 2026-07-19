@@ -85,7 +85,6 @@
   .grid{display:grid; gap:12px;}
   .grid-4{grid-template-columns:repeat(4,1fr);}
   .grid-3{grid-template-columns:repeat(3,1fr);}
-  @media(max-width:900px){.grid-4,.grid-3{grid-template-columns:repeat(2,1fr);}}
   .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px;}
   .metric-label{font-size:11.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;}
   .metric-value{font-size:23px; font-weight:600;}
@@ -159,6 +158,47 @@
   .bar-track{flex:1; height:14px; background:var(--surface-2); border-radius:3px; overflow:hidden; display:flex;}
   .bar-fill{height:100%;}
   .bar-value{width:96px; text-align:right; font-family:'IBM Plex Mono',monospace;}
+
+  .required-mark{color:var(--red);}
+  .field-hint{font-size:11px; color:var(--text-faint); margin-top:14px;}
+
+  /* --- table scroll wrapper (mobile-safe) --- */
+  .table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  .table-scroll table{min-width:640px;}
+
+  /* --- responsive: tablet/phone --- */
+  @media (max-width:900px){
+    .grid-4, .grid-3{ grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width:768px){
+    body{ flex-direction:column; }
+    #sidebar{
+      width:100%; flex-direction:row; align-items:center; gap:2px;
+      padding:8px 10px; overflow-x:auto; white-space:nowrap;
+      border-right:none; border-bottom:1px solid var(--line);
+    }
+    #sidebar img{ display:none; }
+    #sidebar > p.brand-sub{ display:none; }
+    .nav-btn{ width:auto; flex-shrink:0; padding:8px 12px; }
+    #sidebarFooter{
+      margin-top:0 !important; border-top:none !important; padding-top:0 !important;
+      display:flex; align-items:center; gap:6px; flex-shrink:0;
+    }
+    #sidebarFooter p{ display:none; }
+    #sidebarFooter #btnLogout{ width:auto; padding:8px 12px; }
+    #main{ padding:16px; max-width:100%; }
+    .view-title{ font-size:19px; }
+    .stamp{ padding:6px 12px; }
+  }
+  @media (max-width:520px){
+    .grid-4, .grid-3{ grid-template-columns:1fr; }
+    .modal{ padding:18px; max-width:100%; }
+    .card{ padding:13px 14px; }
+    .metric-value{ font-size:20px; }
+    .view-header{ gap:8px; }
+    .filters{ gap:6px; }
+    .filters select, .filters input{ flex:1 1 auto; }
+  }
 </style>
 </head>
 <body>
@@ -175,7 +215,7 @@
   <button class="nav-btn" data-view="contas" id="navContas" style="display:none;"><span class="nav-dot"></span>Contas</button>
   <button class="nav-btn" data-view="usuarios" id="navUsuarios" style="display:none;"><span class="nav-dot"></span>Usuários</button>
 
-  <div style="margin-top:auto; padding-top:14px; border-top:1px solid var(--line);">
+  <div id="sidebarFooter" style="margin-top:auto; padding-top:14px; border-top:1px solid var(--line);">
     <p style="font-size:11.5px; color:var(--text-faint); padding:0 8px 4px;">Conectado como</p>
     <p id="userEmailLabel" style="font-size:12.5px; color:var(--text-dim); padding:0 8px 8px; word-break:break-all;">—</p>
     <button class="nav-btn" id="btnLogout" style="color:var(--red);"><span class="nav-dot"></span>Sair</button>
@@ -207,14 +247,14 @@
 
     <section class="block">
       <div class="block-title">Pendentes neste mês</div>
-      <div class="card" style="padding:0;">
+      <div class="card table-scroll" style="padding:0;">
         <table id="dashPendentesTable"><thead><tr><th>Descrição</th><th>Categoria</th><th>Vencimento</th><th style="text-align:right">Valor</th><th></th></tr></thead><tbody></tbody></table>
       </div>
     </section>
 
     <section class="block">
       <div class="block-title">Contratos a vencer (próximos 60 dias)</div>
-      <div class="card" style="padding:0;">
+      <div class="card table-scroll" style="padding:0;">
         <table id="dashContratosVencerTable"><thead><tr><th>Cliente</th><th>Objeto</th><th>Fim da vigência</th><th id="colMensalidadeVencer" style="text-align:right">Mensalidade</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
@@ -242,7 +282,7 @@
       <select id="filtroConta"><option value="">Todas as contas</option></select>
     </div>
 
-    <div class="card" style="padding:0;">
+    <div class="card table-scroll" style="padding:0;">
       <table id="lancamentosTable">
         <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Conta</th><th>Cliente/Contrato</th><th>Vencimento</th><th>Status</th><th style="text-align:right">Valor</th><th></th></tr></thead>
         <tbody></tbody>
@@ -259,7 +299,7 @@
       </div>
       <button class="btn btn-primary" id="btnNovoContrato">+ Novo contrato</button>
     </div>
-    <div class="card" style="padding:0;">
+    <div class="card table-scroll" style="padding:0;">
       <table id="contratosTable">
         <thead><tr><th>Cliente</th><th>Objeto</th><th>Conta</th><th>Vencimento</th><th>Vigência</th><th>Status</th><th style="text-align:right">Mensalidade</th><th></th></tr></thead>
         <tbody></tbody>
@@ -276,7 +316,7 @@
       </div>
       <button class="btn btn-primary" id="btnNovoCliente">+ Novo cliente</button>
     </div>
-    <div class="card" style="padding:0;">
+    <div class="card table-scroll" style="padding:0;">
       <table id="clientesTable">
         <thead><tr><th>Nome</th><th>CNPJ</th><th>Contato</th><th>Contratos ativos</th><th></th></tr></thead>
         <tbody></tbody>
@@ -293,7 +333,7 @@
       </div>
       <button class="btn btn-primary" id="btnNovoModelo">+ Novo modelo</button>
     </div>
-    <div class="card" style="padding:0;">
+    <div class="card table-scroll" style="padding:0;">
       <table id="modelosTable">
         <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Conta</th><th>Cliente/Contrato</th><th>Dia venc.</th><th style="text-align:right">Valor</th><th>Ativo</th><th></th></tr></thead>
         <tbody></tbody>
@@ -318,7 +358,7 @@
 
     <section class="block">
       <div class="block-title">Detalhamento mensal</div>
-      <div class="card" style="padding:0;">
+      <div class="card table-scroll" style="padding:0;">
         <table id="relMensalTable">
           <thead><tr><th>Mês</th><th style="text-align:right">Entradas</th><th style="text-align:right">Saídas</th><th style="text-align:right">Impostos</th><th style="text-align:right">Lucro</th></tr></thead>
           <tbody></tbody>
@@ -328,7 +368,7 @@
 
     <section class="block">
       <div class="block-title">Receita por cliente (mês selecionado no painel)</div>
-      <div class="card" style="padding:0;">
+      <div class="card table-scroll" style="padding:0;">
         <table id="relClienteTable">
           <thead><tr><th>Cliente</th><th style="text-align:right">Recebido no mês</th></tr></thead>
           <tbody></tbody>
@@ -346,7 +386,7 @@
       </div>
       <button class="btn btn-primary" id="btnNovaConta">+ Nova conta</button>
     </div>
-    <div class="card" style="padding:0;">
+    <div class="card table-scroll" style="padding:0;">
       <table id="contasTable">
         <thead><tr><th>Nome</th><th>Observações</th><th></th></tr></thead>
         <tbody></tbody>
@@ -363,7 +403,7 @@
       </div>
       <button class="btn btn-primary" id="btnNovoUsuario">+ Novo usuário</button>
     </div>
-    <div class="card" style="padding:0;">
+    <div class="card table-scroll" style="padding:0;">
       <table id="usuariosTable">
         <thead><tr><th>E-mail</th><th>Perfil</th><th>Permissões</th><th></th></tr></thead>
         <tbody></tbody>
@@ -381,8 +421,9 @@
   <div class="modal">
     <h3 id="modalContaTitle">Nova conta</h3>
     <input type="hidden" id="contaId">
-    <div class="field"><label>Nome da conta</label><input type="text" id="contaNome" placeholder="Ex: Caixa principal, Conta reserva, Sócio A..."></div>
+    <div class="field"><label>Nome da conta <span class="required-mark">*</span></label><input type="text" id="contaNome" placeholder="Ex: Caixa principal, Conta reserva, Sócio A..." required></div>
     <div class="field"><label>Observações</label><input type="text" id="contaObs"></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('overlayConta')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarConta()">Salvar</button>
@@ -395,10 +436,11 @@
   <div class="modal">
     <h3 id="modalClienteTitle">Novo cliente</h3>
     <input type="hidden" id="clienteId">
-    <div class="field"><label>Nome do órgão / cliente</label><input type="text" id="clienteNome" placeholder="Prefeitura Municipal de..."></div>
+    <div class="field"><label>Nome do órgão / cliente <span class="required-mark">*</span></label><input type="text" id="clienteNome" placeholder="Prefeitura Municipal de..." required></div>
     <div class="field"><label>CNPJ</label><input type="text" id="clienteCnpj" placeholder="00.000.000/0000-00"></div>
     <div class="field"><label>Contato / responsável</label><input type="text" id="clienteContato" placeholder="Nome, telefone ou e-mail"></div>
     <div class="field"><label>Observações</label><input type="text" id="clienteObs"></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('overlayCliente')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarCliente()">Salvar</button>
@@ -411,23 +453,24 @@
   <div class="modal">
     <h3 id="modalContratoTitle">Novo contrato</h3>
     <input type="hidden" id="contratoId">
-    <div class="field"><label>Cliente</label><select id="contratoCliente"></select></div>
-    <div class="field"><label>Objeto (qual software é locado)</label><input type="text" id="contratoObjeto" placeholder="Sistema de gestão de..."></div>
+    <div class="field"><label>Cliente <span class="required-mark">*</span></label><select id="contratoCliente" required></select></div>
+    <div class="field"><label>Objeto (qual software é locado) <span class="required-mark">*</span></label><input type="text" id="contratoObjeto" placeholder="Sistema de gestão de..." required></div>
     <div class="field-row">
-      <div class="field"><label>Valor da mensalidade (R$)</label><input type="number" step="0.01" id="contratoValor"></div>
-      <div class="field"><label>Dia de vencimento</label><input type="number" min="1" max="28" id="contratoDiaVenc"></div>
+      <div class="field"><label>Valor da mensalidade (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="contratoValor" required></div>
+      <div class="field"><label>Dia de vencimento <span class="required-mark">*</span></label><input type="number" min="1" max="28" id="contratoDiaVenc" required></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Início da vigência</label><input type="date" id="contratoInicio"></div>
+      <div class="field"><label>Início da vigência <span class="required-mark">*</span></label><input type="date" id="contratoInicio" required></div>
       <div class="field"><label>Fim da vigência</label><input type="date" id="contratoFim"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Status</label>
+      <div class="field"><label>Status <span class="required-mark">*</span></label>
         <select id="contratoStatus"><option>Ativo</option><option>Suspenso</option><option>Encerrado</option></select>
       </div>
       <div class="field"><label>Conta</label><select id="contratoConta"><option value="">Nenhuma</option></select></div>
     </div>
     <div class="field"><label>Observações (reajuste, índice, etc.)</label><input type="text" id="contratoObs"></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('overlayContrato')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarContrato()">Salvar</button>
@@ -440,20 +483,21 @@
   <div class="modal">
     <h3 id="modalModeloTitle">Novo modelo recorrente</h3>
     <input type="hidden" id="modeloId">
-    <div class="field"><label>Descrição</label><input type="text" id="modeloDescricao" placeholder="Ex: Mensalidade Prefeitura X / Aluguel do escritório"></div>
+    <div class="field"><label>Descrição <span class="required-mark">*</span></label><input type="text" id="modeloDescricao" placeholder="Ex: Mensalidade Prefeitura X / Aluguel do escritório" required></div>
     <div class="field-row">
-      <div class="field"><label>Tipo</label><select id="modeloTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
-      <div class="field"><label>Categoria</label><select id="modeloCategoria"></select></div>
+      <div class="field"><label>Tipo <span class="required-mark">*</span></label><select id="modeloTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
+      <div class="field"><label>Categoria <span class="required-mark">*</span></label><select id="modeloCategoria" required></select></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Contrato vinculado (opcional)</label><select id="modeloContrato"><option value="">Nenhum</option></select></div>
       <div class="field"><label>Conta</label><select id="modeloConta"><option value="">Nenhuma</option></select></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="modeloValor"></div>
-      <div class="field"><label>Dia do mês</label><input type="number" min="1" max="28" id="modeloDia"></div>
+      <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="modeloValor" required></div>
+      <div class="field"><label>Dia do mês <span class="required-mark">*</span></label><input type="number" min="1" max="28" id="modeloDia" required></div>
     </div>
     <div class="checkbox-row"><input type="checkbox" id="modeloAtivo" checked> <label for="modeloAtivo">Modelo ativo (gera lançamento todo mês)</label></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('overlayModelo')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarModelo()">Salvar</button>
@@ -466,19 +510,20 @@
   <div class="modal">
     <h3>Novo lançamento manual</h3>
     <input type="hidden" id="lancamentoId">
-    <div class="field"><label>Descrição</label><input type="text" id="lancDescricao"></div>
+    <div class="field"><label>Descrição <span class="required-mark">*</span></label><input type="text" id="lancDescricao" required></div>
     <div class="field-row">
-      <div class="field"><label>Tipo</label><select id="lancTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
-      <div class="field"><label>Categoria</label><select id="lancCategoria"></select></div>
+      <div class="field"><label>Tipo <span class="required-mark">*</span></label><select id="lancTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
+      <div class="field"><label>Categoria <span class="required-mark">*</span></label><select id="lancCategoria" required></select></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Cliente/Contrato (opcional)</label><select id="lancContrato"><option value="">Nenhum</option></select></div>
       <div class="field"><label>Conta</label><select id="lancConta"><option value="">Nenhuma</option></select></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Valor (R$)</label><input type="number" step="0.01" id="lancValor"></div>
-      <div class="field"><label>Data prevista</label><input type="date" id="lancData"></div>
+      <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="lancValor" required></div>
+      <div class="field"><label>Data prevista <span class="required-mark">*</span></label><input type="date" id="lancData" required></div>
     </div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('overlayLancamento')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarLancamento()">Salvar</button>
@@ -505,8 +550,8 @@
   <div class="modal" style="max-width:560px;">
     <h3 id="modalUsuarioTitle">Novo usuário</h3>
     <input type="hidden" id="usuarioId">
-    <div class="field"><label>E-mail (já cadastrado no Firebase Authentication)</label><input type="text" id="usuarioEmail" placeholder="pessoa@exemplo.com"></div>
-    <div class="field"><label>Perfil</label>
+    <div class="field"><label>E-mail (já cadastrado no Firebase Authentication) <span class="required-mark">*</span></label><input type="text" id="usuarioEmail" placeholder="pessoa@exemplo.com" required></div>
+    <div class="field"><label>Perfil <span class="required-mark">*</span></label>
       <select id="usuarioRole">
         <option value="cadastrador">Cadastrador (permissões personalizadas)</option>
         <option value="admin">Administrador (acesso total)</option>
@@ -518,6 +563,7 @@
         <tbody id="permissoesTableBody"></tbody>
       </table>
     </div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('overlayUsuario')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarUsuario()">Salvar</button>
@@ -969,12 +1015,16 @@ document.getElementById('btnNovoLancamento').onclick = ()=>{
 };
 function salvarLancamento(){
   const descricao = document.getElementById('lancDescricao').value.trim();
+  const categoriaId = document.getElementById('lancCategoria').value;
   const valor = parseFloat(document.getElementById('lancValor').value);
   const data = document.getElementById('lancData').value;
-  if(!descricao || !valor || !data){ toast('Preencha descrição, valor e data'); return; }
+  if(!descricao){ toast('Informe a descrição'); return; }
+  if(!categoriaId){ toast('Selecione a categoria'); return; }
+  if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
+  if(!data){ toast('Informe a data prevista'); return; }
   DB.lancamentos.push({
     id:uid(), tipo:document.getElementById('lancTipo').value,
-    categoriaId:document.getElementById('lancCategoria').value,
+    categoriaId,
     contratoId:document.getElementById('lancContrato').value || null,
     contaId:document.getElementById('lancConta').value || null,
     descricao, valor, dataPrevista:data, status:'Pendente', dataPagamento:null, modeloId:null
@@ -1041,15 +1091,21 @@ function editarContrato(id){
 }
 function salvarContrato(){
   if(!canEdit('contratos')) return;
+  const clienteId = document.getElementById('contratoCliente').value;
   const objeto = document.getElementById('contratoObjeto').value.trim();
   const valor = parseFloat(document.getElementById('contratoValor').value);
-  if(!objeto || !valor){ toast('Preencha objeto e valor da mensalidade'); return; }
+  const diaVenc = parseInt(document.getElementById('contratoDiaVenc').value);
+  const dataInicio = document.getElementById('contratoInicio').value;
+  if(!clienteId){ toast('Selecione o cliente'); return; }
+  if(!objeto){ toast('Informe o objeto do contrato'); return; }
+  if(!valor || valor<=0){ toast('Informe um valor de mensalidade válido'); return; }
+  if(!diaVenc || diaVenc<1 || diaVenc>28){ toast('Informe um dia de vencimento válido (1 a 28)'); return; }
+  if(!dataInicio){ toast('Informe a data de início da vigência'); return; }
   const id = document.getElementById('contratoId').value;
   const data = {
-    clienteId:document.getElementById('contratoCliente').value,
-    objeto, valorMensal:valor,
-    diaVencimento:parseInt(document.getElementById('contratoDiaVenc').value)||10,
-    dataInicio:document.getElementById('contratoInicio').value,
+    clienteId, objeto, valorMensal:valor,
+    diaVencimento:diaVenc,
+    dataInicio,
     dataFim:document.getElementById('contratoFim').value||null,
     status:document.getElementById('contratoStatus').value,
     contaId:document.getElementById('contratoConta').value || null,
@@ -1061,6 +1117,8 @@ function salvarContrato(){
 }
 function excluirContrato(id){
   if(!canEdit('contratos')) return;
+  const vinculado = DB.lancamentos.some(l=>l.contratoId===id) || DB.modelos.some(m=>m.contratoId===id);
+  if(vinculado){ toast('Não é possível excluir: há lançamentos ou modelos vinculados a este contrato'); return; }
   DB.contratos = DB.contratos.filter(c=>c.id!==id);
   save('contratos').then(()=>{ toast('Contrato excluído'); renderAll(); });
 }
@@ -1114,6 +1172,8 @@ function salvarCliente(){
 }
 function excluirCliente(id){
   if(!canEdit('clientes')) return;
+  const vinculado = DB.contratos.some(c=>c.clienteId===id);
+  if(vinculado){ toast('Não é possível excluir: há contratos vinculados a este cliente'); return; }
   DB.clientes = DB.clientes.filter(c=>c.id!==id);
   save('clientes').then(()=>{ toast('Cliente excluído'); renderAll(); });
 }
@@ -1189,18 +1249,22 @@ function editarModelo(id){
 }
 function salvarModelo(){
   const descricao = document.getElementById('modeloDescricao').value.trim();
+  const categoriaId = document.getElementById('modeloCategoria').value;
   const valor = parseFloat(document.getElementById('modeloValor').value);
-  if(!descricao || !valor){ toast('Preencha descrição e valor'); return; }
+  const dia = parseInt(document.getElementById('modeloDia').value);
+  if(!descricao){ toast('Informe a descrição'); return; }
+  if(!categoriaId){ toast('Selecione a categoria'); return; }
+  if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
+  if(!dia || dia<1 || dia>28){ toast('Informe um dia do mês válido (1 a 28)'); return; }
   const tipo = document.getElementById('modeloTipo').value;
   const key = tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas';
   if(!canEdit(key)){ toast('Sem permissão para salvar'); return; }
   const id = document.getElementById('modeloId').value;
   const data = {
-    descricao, tipo,
-    categoriaId:document.getElementById('modeloCategoria').value,
+    descricao, tipo, categoriaId,
     contratoId:document.getElementById('modeloContrato').value || null,
     contaId:document.getElementById('modeloConta').value || null,
-    valor, dia:parseInt(document.getElementById('modeloDia').value)||10,
+    valor, dia,
     ativo:document.getElementById('modeloAtivo').checked
   };
   if(id){ Object.assign(DB.modelos.find(m=>m.id===id), data); }
@@ -1328,6 +1392,8 @@ function salvarConta(){
 }
 function excluirConta(id){
   if(!isAdmin()) return;
+  const vinculado = DB.contratos.some(c=>c.contaId===id) || DB.modelos.some(m=>m.contaId===id) || DB.lancamentos.some(l=>l.contaId===id);
+  if(vinculado){ toast('Não é possível excluir: há contratos, modelos ou lançamentos vinculados a esta conta'); return; }
   DB.contas = DB.contas.filter(c=>c.id!==id);
   save('contas').then(()=>{ toast('Conta excluída'); renderAll(); });
 }
