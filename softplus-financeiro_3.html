@@ -7,6 +7,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d4fc4">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SOFT+ Financeiro">
+
 <style>
   :root{
     --ink:#eef4fb; --surface:#ffffff; --surface-2:#eef5fc; --line:#d7e4f0;
@@ -216,6 +225,7 @@
   <button class="nav-btn" data-view="usuarios" id="navUsuarios" style="display:none;"><span class="nav-dot"></span>Usuários</button>
 
   <div id="sidebarFooter" style="margin-top:auto; padding-top:14px; border-top:1px solid var(--line);">
+    <button class="nav-btn" id="btnInstalarApp" style="color:var(--brand); display:none;"><span class="nav-dot"></span>Instalar app</button>
     <p style="font-size:11.5px; color:var(--text-faint); padding:0 8px 4px;">Conectado como</p>
     <p id="userEmailLabel" style="font-size:12.5px; color:var(--text-dim); padding:0 8px 8px; word-break:break-all;">—</p>
     <button class="nav-btn" id="btnLogout" style="color:var(--red);"><span class="nav-dot"></span>Sair</button>
@@ -610,6 +620,57 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ---- PWA: registro do service worker + botão fixo de instalação ----
+// Por quê botão fixo: o banner automático do navegador não é confiável
+// (não existe no iPhone e às vezes o Chrome/Android não dispara sozinho).
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(err){
+      console.warn('Falha ao registrar service worker:', err);
+    });
+  });
+}
+
+let deferredInstallPrompt = null;
+const btnInstalarApp = document.getElementById('btnInstalarApp');
+
+// Detecta se o app já está rodando instalado (modo standalone) para esconder o botão.
+function appJaInstalado(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if(!appJaInstalado() && btnInstalarApp) btnInstalarApp.style.display = 'flex';
+});
+
+window.addEventListener('appinstalled', function(){
+  deferredInstallPrompt = null;
+  if(btnInstalarApp) btnInstalarApp.style.display = 'none';
+  toast('App instalado com sucesso!');
+});
+
+if(btnInstalarApp){
+  // iOS/Safari não dispara beforeinstallprompt: mostramos o botão sempre lá,
+  // com instrução manual ao clicar.
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if(isIOS && !appJaInstalado()) btnInstalarApp.style.display = 'flex';
+
+  btnInstalarApp.addEventListener('click', function(){
+    if(deferredInstallPrompt){
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.finally(function(){
+        deferredInstallPrompt = null;
+      });
+    } else if(isIOS){
+      toast('No iPhone: toque em Compartilhar e depois em "Adicionar à Tela de Início"');
+    } else {
+      toast('Use o menu do navegador (⋮) e escolha "Instalar app" ou "Adicionar à tela inicial"');
+    }
+  });
+}
+
 let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[], contas:[] };
 let dashDate = new Date();
 let currentUser = null;
