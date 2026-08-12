@@ -7,15 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0d4fc4">
-<link rel="apple-touch-icon" href="icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="SOFT+ Financeiro">
-
 <style>
   :root{
     --ink:#eef4fb; --surface:#ffffff; --surface-2:#eef5fc; --line:#d7e4f0;
@@ -225,7 +216,6 @@
   <button class="nav-btn" data-view="usuarios" id="navUsuarios" style="display:none;"><span class="nav-dot"></span>Usuários</button>
 
   <div id="sidebarFooter" style="margin-top:auto; padding-top:14px; border-top:1px solid var(--line);">
-    <button class="nav-btn" id="btnInstalarApp" style="color:var(--brand); display:none;"><span class="nav-dot"></span>Instalar app</button>
     <p style="font-size:11.5px; color:var(--text-faint); padding:0 8px 4px;">Conectado como</p>
     <p id="userEmailLabel" style="font-size:12.5px; color:var(--text-dim); padding:0 8px 8px; word-break:break-all;">—</p>
     <button class="nav-btn" id="btnLogout" style="color:var(--red);"><span class="nav-dot"></span>Sair</button>
@@ -499,7 +489,10 @@
   <div class="modal">
     <h3 id="modalContratoTitle">Novo contrato</h3>
     <input type="hidden" id="contratoId">
-    <div class="field"><label>Cliente <span class="required-mark">*</span></label><select id="contratoCliente" required></select></div>
+    <div class="field"><label>Cliente <span class="required-mark">*</span></label>
+      <input type="text" id="contratoCliente" list="dlClientes" placeholder="Digite para buscar..." autocomplete="off" required>
+      <datalist id="dlClientes"></datalist>
+    </div>
     <div class="field"><label>Objeto (qual software é locado) <span class="required-mark">*</span></label><input type="text" id="contratoObjeto" placeholder="Sistema de gestão de..." required></div>
     <div class="field-row">
       <div class="field"><label>Valor da mensalidade (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="contratoValor" required></div>
@@ -513,7 +506,10 @@
       <div class="field"><label>Status <span class="required-mark">*</span></label>
         <select id="contratoStatus"><option>Ativo</option><option>Suspenso</option><option>Encerrado</option></select>
       </div>
-      <div class="field"><label>Conta</label><select id="contratoConta"><option value="">Nenhuma</option></select></div>
+      <div class="field"><label>Conta</label>
+        <input type="text" id="contratoConta" list="dlContas" placeholder="Digite para buscar... (opcional)" autocomplete="off">
+        <datalist id="dlContas"></datalist>
+      </div>
     </div>
     <div class="field"><label>Observações (reajuste, índice, etc.)</label><input type="text" id="contratoObs"></div>
     <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
@@ -532,15 +528,23 @@
     <div class="field"><label>Descrição <span class="required-mark">*</span></label><input type="text" id="modeloDescricao" placeholder="Ex: Mensalidade Prefeitura X / Aluguel do escritório" required></div>
     <div class="field-row">
       <div class="field"><label>Tipo <span class="required-mark">*</span></label><select id="modeloTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
-      <div class="field"><label>Categoria <span class="required-mark">*</span></label><select id="modeloCategoria" required></select></div>
+      <div class="field"><label>Categoria <span class="required-mark">*</span></label>
+        <input type="text" id="modeloCategoria" list="dlCategoriasModelo" placeholder="Digite para buscar..." autocomplete="off" required>
+        <datalist id="dlCategoriasModelo"></datalist>
+      </div>
+    </div>
+    <div class="field"><label>Conta</label>
+      <input type="text" id="modeloConta" list="dlContas" placeholder="Digite para buscar... (opcional)" autocomplete="off">
+    </div>
+    <div class="field">
+      <label>Contratos vinculados (opcional — marque um ou mais)</label>
+      <input type="text" id="modeloContratoBusca" placeholder="Buscar contrato por cliente ou objeto..." autocomplete="off">
+      <div id="modeloContratoLista" style="max-height:150px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:6px; margin-top:6px;"></div>
+      <p id="modeloContratoResumo" style="font-size:12px; color:var(--text-dim); margin-top:6px;"></p>
     </div>
     <div class="field-row">
-      <div class="field"><label>Contrato vinculado (opcional)</label><select id="modeloContrato"><option value="">Nenhum</option></select></div>
-      <div class="field"><label>Conta</label><select id="modeloConta"><option value="">Nenhuma</option></select></div>
-    </div>
-    <div class="field-row">
-      <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="modeloValor" required></div>
-      <div class="field"><label>Dia do mês <span class="required-mark">*</span></label><input type="number" min="1" max="28" id="modeloDia" required></div>
+      <div class="field" id="modeloValorField"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="modeloValor" required></div>
+      <div class="field" id="modeloDiaField"><label>Dia do mês <span class="required-mark">*</span></label><input type="number" min="1" max="28" id="modeloDia" required></div>
     </div>
     <div class="checkbox-row"><input type="checkbox" id="modeloAtivo" checked> <label for="modeloAtivo">Modelo ativo (gera lançamento todo mês)</label></div>
     <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
@@ -559,11 +563,19 @@
     <div class="field"><label>Descrição <span class="required-mark">*</span></label><input type="text" id="lancDescricao" required></div>
     <div class="field-row">
       <div class="field"><label>Tipo <span class="required-mark">*</span></label><select id="lancTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
-      <div class="field"><label>Categoria <span class="required-mark">*</span></label><select id="lancCategoria" required></select></div>
+      <div class="field"><label>Categoria <span class="required-mark">*</span></label>
+        <input type="text" id="lancCategoria" list="dlCategoriasLanc" placeholder="Digite para buscar..." autocomplete="off" required>
+        <datalist id="dlCategoriasLanc"></datalist>
+      </div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Cliente/Contrato (opcional)</label><select id="lancContrato"><option value="">Nenhum</option></select></div>
-      <div class="field"><label>Conta</label><select id="lancConta"><option value="">Nenhuma</option></select></div>
+      <div class="field"><label>Cliente/Contrato (opcional)</label>
+        <input type="text" id="lancContrato" list="dlContratos" placeholder="Digite para buscar... (opcional)" autocomplete="off">
+        <datalist id="dlContratos"></datalist>
+      </div>
+      <div class="field"><label>Conta</label>
+        <input type="text" id="lancConta" list="dlContas" placeholder="Digite para buscar... (opcional)" autocomplete="off">
+      </div>
     </div>
     <div class="field-row">
       <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="lancValor" required></div>
@@ -620,57 +632,6 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ---- PWA: registro do service worker + botão fixo de instalação ----
-// Por quê botão fixo: o banner automático do navegador não é confiável
-// (não existe no iPhone e às vezes o Chrome/Android não dispara sozinho).
-if('serviceWorker' in navigator){
-  window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js').catch(function(err){
-      console.warn('Falha ao registrar service worker:', err);
-    });
-  });
-}
-
-let deferredInstallPrompt = null;
-const btnInstalarApp = document.getElementById('btnInstalarApp');
-
-// Detecta se o app já está rodando instalado (modo standalone) para esconder o botão.
-function appJaInstalado(){
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-}
-
-window.addEventListener('beforeinstallprompt', function(e){
-  e.preventDefault();
-  deferredInstallPrompt = e;
-  if(!appJaInstalado() && btnInstalarApp) btnInstalarApp.style.display = 'flex';
-});
-
-window.addEventListener('appinstalled', function(){
-  deferredInstallPrompt = null;
-  if(btnInstalarApp) btnInstalarApp.style.display = 'none';
-  toast('App instalado com sucesso!');
-});
-
-if(btnInstalarApp){
-  // iOS/Safari não dispara beforeinstallprompt: mostramos o botão sempre lá,
-  // com instrução manual ao clicar.
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  if(isIOS && !appJaInstalado()) btnInstalarApp.style.display = 'flex';
-
-  btnInstalarApp.addEventListener('click', function(){
-    if(deferredInstallPrompt){
-      deferredInstallPrompt.prompt();
-      deferredInstallPrompt.userChoice.finally(function(){
-        deferredInstallPrompt = null;
-      });
-    } else if(isIOS){
-      toast('No iPhone: toque em Compartilhar e depois em "Adicionar à Tela de Início"');
-    } else {
-      toast('Use o menu do navegador (⋮) e escolha "Instalar app" ou "Adicionar à tela inicial"');
-    }
-  });
-}
-
 let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[], contas:[] };
 let dashDate = new Date();
 let currentUser = null;
@@ -958,13 +919,14 @@ const IMPORT_EXPORT_CONFIG = {
     label:'Modelos recorrentes',
     headers:['ID','Descricao','Tipo','Categoria','Contrato','Conta','Valor','Dia','Ativo'],
     example:{ID:'', Descricao:'Mensalidade Prefeitura Exemplo', Tipo:'entrada', Categoria:'Mensalidade de contrato', Contrato:'', Conta:'', Valor:'1500.00', Dia:'10', Ativo:'Sim'},
-    toRow(m){ return {ID:m.id, Descricao:m.descricao, Tipo:m.tipo, Categoria:catName(m.categoriaId), Contrato:m.contratoId?contratoLabel(m.contratoId):'', Conta:m.contaId?contaNome(m.contaId):'', Valor:m.valor, Dia:m.dia, Ativo:m.ativo?'Sim':'Não'}; },
+    toRow(m){
+      const ids = getModeloContratoIds(m);
+      return {ID:m.id, Descricao:m.descricao, Tipo:m.tipo, Categoria:catName(m.categoriaId), Contrato: ids.map(id=>contratoLabel(id)).join('; '), Conta:m.contaId?contaNome(m.contaId):'', Valor:m.valor, Dia:m.dia||'', Ativo:m.ativo?'Sim':'Não'};
+    },
     fromRow(row){
       const descricao=(row.Descricao||'').trim();
       const tipo=(row.Tipo||'').trim().toLowerCase();
       const categoriaNomeRaw=(row.Categoria||'').trim();
-      const valor=parseFloat((row.Valor||'').replace(',','.'));
-      const dia=parseInt(row.Dia);
       if(!descricao) return {error:'coluna Descricao vazia'};
       if(tipo!=='entrada' && tipo!=='saida') return {error:'Tipo deve ser "entrada" ou "saida"'};
       const permKey = tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas';
@@ -972,17 +934,31 @@ const IMPORT_EXPORT_CONFIG = {
       if(!categoriaNomeRaw) return {error:'coluna Categoria vazia'};
       const categoriaId = findCategoriaId(categoriaNomeRaw, tipo);
       if(categoriaId===undefined) return {error:`categoria "${categoriaNomeRaw}" não encontrada para o tipo ${tipo}`};
-      if(!valor || valor<=0) return {error:'Valor inválido'};
-      if(!dia || dia<1 || dia>28) return {error:'Dia inválido (use 1 a 28)'};
       let warning=null;
       const contratoRaw=(row.Contrato||'').trim();
-      let contratoId=null;
-      if(contratoRaw){ const found=findContratoId(contratoRaw); if(found===undefined) warning=(warning?warning+'; ':'')+`contrato "${contratoRaw}" não encontrado`; else contratoId=found; }
+      const contratoIds=[];
+      if(contratoRaw){
+        contratoRaw.split(';').map(s=>s.trim()).filter(Boolean).forEach(p=>{
+          const found=findContratoId(p);
+          if(found===undefined) warning=(warning?warning+'; ':'')+`contrato "${p}" não encontrado`;
+          else contratoIds.push(found);
+        });
+      }
       const contaRaw=(row.Conta||'').trim();
       let contaId=null;
       if(contaRaw){ const found=findContaId(contaRaw); if(found===undefined) warning=(warning?warning+'; ':'')+`conta "${contaRaw}" não encontrada`; else contaId=found; }
+      let valor, dia;
+      if(contratoIds.length>0){
+        valor = contratoIds.reduce((s,id)=>{ const c=DB.contratos.find(x=>x.id===id); return s+(c?c.valorMensal:0); }, 0);
+        dia = null;
+      }else{
+        valor=parseFloat((row.Valor||'').replace(',','.'));
+        dia=parseInt(row.Dia);
+        if(!valor || valor<=0) return {error:'Valor inválido'};
+        if(!dia || dia<1 || dia>28) return {error:'Dia inválido (use 1 a 28)'};
+      }
       const ativo = (row.Ativo||'').trim()==='' || /^(sim|s|true|1)$/i.test((row.Ativo||'').trim());
-      return {id:(row.ID||'').trim(), warning, record:{descricao, tipo, categoriaId, contratoId, contaId, valor, dia, ativo}};
+      return {id:(row.ID||'').trim(), warning, record:{descricao, tipo, categoriaId, contratoIds, contratoId: contratoIds[0]||null, contaId, valor, dia, ativo}};
     }
   },
   lancamentos: {
@@ -1165,34 +1141,106 @@ function setOptionsPreserveValue(sel, optionsHtml){
   if(Array.from(sel.options).some(o=>o.value===prev)) sel.value = prev;
 }
 
+function sortByLabel(items, labelFn){
+  return [...items].sort((a,b)=>labelFn(a).localeCompare(labelFn(b), 'pt-BR', {sensitivity:'base'}));
+}
+function fillDatalist(datalistId, labels){
+  const dl = document.getElementById(datalistId);
+  if(!dl) return;
+  dl.innerHTML = labels.map(l=>`<option value="${String(l).replace(/"/g,'&quot;')}"></option>`).join('');
+}
+function refreshCategoriaDatalist(datalistId, tipo){
+  const labels = sortByLabel(DB.categorias.filter(c=>c.tipo===tipo), c=>c.nome).map(c=>c.nome);
+  fillDatalist(datalistId, labels);
+}
+
 function fillSelects(){
-  const clienteSel = document.getElementById('contratoCliente');
-  clienteSel.innerHTML = DB.clientes.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('') || '<option value="">Cadastre um cliente primeiro</option>';
+  // Campos com busca + ordem alfabética (texto + datalist, resolvidos por nome ao salvar)
+  fillDatalist('dlClientes', sortByLabel(DB.clientes, c=>c.nome).map(c=>c.nome));
+  fillDatalist('dlContas', sortByLabel(DB.contas, c=>c.nome).map(c=>c.nome));
+  fillDatalist('dlContratos', sortByLabel(DB.contratos, c=>contratoLabel(c.id)).map(c=>contratoLabel(c.id)));
+  refreshCategoriaDatalist('dlCategoriasModelo', document.getElementById('modeloTipo').value);
+  refreshCategoriaDatalist('dlCategoriasLanc', document.getElementById('lancTipo').value);
 
-  const contratoOpts = '<option value="">Nenhum</option>' + DB.contratos.map(c=>`<option value="${c.id}">${clienteNome(c.clienteId)} — ${c.objeto}</option>`).join('');
-  document.getElementById('modeloContrato').innerHTML = contratoOpts;
-  document.getElementById('lancContrato').innerHTML = contratoOpts;
-
-  const contaOptsNenhuma = '<option value="">Nenhuma</option>' + DB.contas.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
-  setOptionsPreserveValue(document.getElementById('modeloConta'), contaOptsNenhuma);
-  setOptionsPreserveValue(document.getElementById('lancConta'), contaOptsNenhuma);
-  setOptionsPreserveValue(document.getElementById('contratoConta'), contaOptsNenhuma);
-
-  const contaOptsTodas = '<option value="">Todas as contas</option>' + DB.contas.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+  // Selects simples de filtro — continuam <select>, só ordenados alfabeticamente
+  const contaOptsTodas = '<option value="">Todas as contas</option>' + sortByLabel(DB.contas, c=>c.nome).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
   setOptionsPreserveValue(document.getElementById('filtroConta'), contaOptsTodas);
   setOptionsPreserveValue(document.getElementById('dashContaFiltro'), contaOptsTodas);
   setOptionsPreserveValue(document.getElementById('relContaFiltro'), contaOptsTodas);
 
-  refreshCategoriaSelect('modeloCategoria', document.getElementById('modeloTipo').value);
-  refreshCategoriaSelect('lancCategoria', document.getElementById('lancTipo').value);
+  renderModeloContratoLista();
 }
+document.getElementById('modeloTipo').addEventListener('change', e=>refreshCategoriaDatalist('dlCategoriasModelo', e.target.value));
+document.getElementById('lancTipo').addEventListener('change', e=>refreshCategoriaDatalist('dlCategoriasLanc', e.target.value));
 
-function refreshCategoriaSelect(selectId, tipo){
-  const sel=document.getElementById(selectId);
-  sel.innerHTML = DB.categorias.filter(c=>c.tipo===tipo).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+/* ---------- SELEÇÃO MÚLTIPLA DE CONTRATOS (Modelo recorrente) ---------- */
+function getModeloContratoIds(m){
+  if(m.contratoIds && m.contratoIds.length) return m.contratoIds;
+  if(m.contratoId) return [m.contratoId];
+  return [];
 }
-document.getElementById('modeloTipo').addEventListener('change', e=>refreshCategoriaSelect('modeloCategoria', e.target.value));
-document.getElementById('lancTipo').addEventListener('change', e=>refreshCategoriaSelect('lancCategoria', e.target.value));
+let modeloContratoSelecionados = new Set();
+function renderModeloContratoLista(){
+  const buscaEl = document.getElementById('modeloContratoBusca');
+  const listEl = document.getElementById('modeloContratoLista');
+  if(!buscaEl || !listEl) return;
+
+  const contaNomeRaw = document.getElementById('modeloConta').value.trim();
+  if(!contaNomeRaw){
+    listEl.innerHTML = `<p style="font-size:12.5px; color:var(--text-faint); padding:6px 2px;">Selecione uma conta acima para ver os contratos vinculados a ela.</p>`;
+    atualizarResumoModeloContratos();
+    return;
+  }
+  const contaId = findContaId(contaNomeRaw);
+  if(contaId===undefined){
+    listEl.innerHTML = `<p style="font-size:12.5px; color:var(--text-faint); padding:6px 2px;">Conta não encontrada — selecione uma da lista.</p>`;
+    atualizarResumoModeloContratos();
+    return;
+  }
+
+  const busca = (buscaEl.value||'').trim().toLowerCase();
+  const doContaSelecionada = DB.contratos.filter(c=>c.contaId===contaId);
+  const ordenados = sortByLabel(doContaSelecionada, c=>contratoLabel(c.id));
+  const filtrados = busca ? ordenados.filter(c=>contratoLabel(c.id).toLowerCase().includes(busca)) : ordenados;
+  if(filtrados.length===0){
+    listEl.innerHTML = `<p style="font-size:12.5px; color:var(--text-faint); padding:6px 2px;">Nenhum contrato vinculado a essa conta${busca?' com esse termo':''}.</p>`;
+  }else{
+    listEl.innerHTML = filtrados.map(c=>`
+      <label style="display:flex; align-items:center; gap:8px; padding:5px 4px; font-size:13px; cursor:pointer;">
+        <input type="checkbox" value="${c.id}" ${modeloContratoSelecionados.has(c.id)?'checked':''} onchange="toggleModeloContrato('${c.id}', this.checked)">
+        <span>${contratoLabel(c.id)} — ${fmtMoney(c.valorMensal)}/mês</span>
+      </label>`).join('');
+  }
+  atualizarResumoModeloContratos();
+}
+function toggleModeloContrato(id, checked){
+  if(checked) modeloContratoSelecionados.add(id); else modeloContratoSelecionados.delete(id);
+  atualizarResumoModeloContratos();
+}
+function getSelectedModeloContratoIds(){ return Array.from(modeloContratoSelecionados); }
+function atualizarResumoModeloContratos(){
+  const ids = getSelectedModeloContratoIds();
+  const resumoEl = document.getElementById('modeloContratoResumo');
+  const valorField = document.getElementById('modeloValorField');
+  const diaField = document.getElementById('modeloDiaField');
+  if(!resumoEl || !valorField || !diaField) return;
+  if(ids.length===0){
+    resumoEl.textContent = '';
+    valorField.style.display = '';
+    diaField.style.display = '';
+  }else{
+    const soma = ids.reduce((s,id)=>{ const c=DB.contratos.find(x=>x.id===id); return s+(c?c.valorMensal:0); }, 0);
+    resumoEl.textContent = `${ids.length} contrato(s) selecionado(s) — total: ${fmtMoney(soma)}/mês. Cada um gera um lançamento separado, usando o dia de vencimento do próprio contrato.`;
+    document.getElementById('modeloValor').value = soma.toFixed(2);
+    valorField.style.display = 'none';
+    diaField.style.display = 'none';
+  }
+}
+document.getElementById('modeloContratoBusca').addEventListener('input', renderModeloContratoLista);
+document.getElementById('modeloConta').addEventListener('input', ()=>{
+  modeloContratoSelecionados = new Set();
+  renderModeloContratoLista();
+});
 
 /* ---------- DASHBOARD ---------- */
 function renderDashboard(){
@@ -1298,17 +1346,37 @@ document.getElementById('btnGerarMes').onclick = async ()=>{
   const ativos = DB.modelos.filter(m=>m.ativo);
   const novos = [];
   ativos.forEach(m=>{
-    const jaExiste = DB.lancamentos.some(l=>l.modeloId===m.id && compOf(l.dataPrevista)===comp);
-    if(jaExiste) return;
-    const dia = String(m.dia).padStart(2,'0');
-    const novo = {
-      id:uid(), tipo:m.tipo, categoriaId:m.categoriaId, contratoId:m.contratoId||null,
-      contaId:m.contaId||null,
-      descricao:m.descricao, valor:m.valor, dataPrevista:`${ano}-${mes}-${dia}`,
-      status:'Pendente', dataPagamento:null, modeloId:m.id
-    };
-    DB.lancamentos.push(novo);
-    novos.push(novo);
+    const contratoIds = getModeloContratoIds(m);
+    if(contratoIds.length > 0){
+      contratoIds.forEach(cid=>{
+        const jaExiste = DB.lancamentos.some(l=>l.modeloId===m.id && l.contratoId===cid && compOf(l.dataPrevista)===comp);
+        if(jaExiste) return;
+        const contrato = DB.contratos.find(c=>c.id===cid);
+        if(!contrato) return;
+        const dia = String(contrato.diaVencimento || 10).padStart(2,'0');
+        const novo = {
+          id:uid(), tipo:m.tipo, categoriaId:m.categoriaId, contratoId:cid,
+          contaId: m.contaId || contrato.contaId || null,
+          descricao: `${m.descricao} — ${contratoLabel(cid)}`,
+          valor: contrato.valorMensal, dataPrevista:`${ano}-${mes}-${dia}`,
+          status:'Pendente', dataPagamento:null, modeloId:m.id
+        };
+        DB.lancamentos.push(novo);
+        novos.push(novo);
+      });
+    }else{
+      const jaExiste = DB.lancamentos.some(l=>l.modeloId===m.id && !l.contratoId && compOf(l.dataPrevista)===comp);
+      if(jaExiste) return;
+      const dia = String(m.dia || 10).padStart(2,'0');
+      const novo = {
+        id:uid(), tipo:m.tipo, categoriaId:m.categoriaId, contratoId:null,
+        contaId:m.contaId||null,
+        descricao:m.descricao, valor:m.valor, dataPrevista:`${ano}-${mes}-${dia}`,
+        status:'Pendente', dataPagamento:null, modeloId:m.id
+      };
+      DB.lancamentos.push(novo);
+      novos.push(novo);
+    }
   });
   await saveBatch('lancamentos', novos);
   const gerados = novos.length;
@@ -1331,7 +1399,7 @@ document.getElementById('btnGerarMes').onclick = async ()=>{
   optTodosAnos.value=''; optTodosAnos.textContent='Todos os anos';
   anoSel.appendChild(optTodosAnos);
   const anoAtual = new Date().getFullYear();
-  for(let y=anoAtual-3; y<=anoAtual+10; y++){
+  for(let y=anoAtual-3; y<=anoAtual+2; y++){
     const opt = document.createElement('option');
     opt.value = String(y); opt.textContent = String(y);
     anoSel.appendChild(opt);
@@ -1427,7 +1495,8 @@ document.getElementById('btnNovoLancamento').onclick = ()=>{
   tipoSel.disabled = !(eEntradas && eSaidas);
   const tipoPadrao = eEntradas ? 'entrada' : 'saida';
   tipoSel.value = tipoPadrao;
-  refreshCategoriaSelect('lancCategoria', tipoPadrao);
+  refreshCategoriaDatalist('dlCategoriasLanc', tipoPadrao);
+  document.getElementById('lancCategoria').value='';
   document.getElementById('lancContrato').value='';
   document.getElementById('lancConta').value='';
   document.getElementById('lancValor').value='';
@@ -1436,18 +1505,25 @@ document.getElementById('btnNovoLancamento').onclick = ()=>{
 };
 function salvarLancamento(){
   const descricao = document.getElementById('lancDescricao').value.trim();
-  const categoriaId = document.getElementById('lancCategoria').value;
+  const tipo = document.getElementById('lancTipo').value;
+  const categoriaNomeRaw = document.getElementById('lancCategoria').value.trim();
   const valor = parseFloat(document.getElementById('lancValor').value);
   const data = document.getElementById('lancData').value;
   if(!descricao){ toast('Informe a descrição'); return; }
-  if(!categoriaId){ toast('Selecione a categoria'); return; }
+  if(!categoriaNomeRaw){ toast('Selecione a categoria'); return; }
+  const categoriaId = findCategoriaId(categoriaNomeRaw, tipo);
+  if(categoriaId===undefined){ toast('Categoria não encontrada — selecione uma da lista'); return; }
   if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
   if(!data){ toast('Informe a data prevista'); return; }
+  const contratoNomeRaw = document.getElementById('lancContrato').value.trim();
+  let contratoId = null;
+  if(contratoNomeRaw){ const found = findContratoId(contratoNomeRaw); if(found===undefined){ toast('Contrato não encontrado — selecione um da lista ou deixe em branco'); return; } contratoId = found; }
+  const contaNomeRaw = document.getElementById('lancConta').value.trim();
+  let contaId = null;
+  if(contaNomeRaw){ const found = findContaId(contaNomeRaw); if(found===undefined){ toast('Conta não encontrada — selecione uma da lista ou deixe em branco'); return; } contaId = found; }
   const novo = {
-    id:uid(), tipo:document.getElementById('lancTipo').value,
-    categoriaId,
-    contratoId:document.getElementById('lancContrato').value || null,
-    contaId:document.getElementById('lancConta').value || null,
+    id:uid(), tipo,
+    categoriaId, contratoId, contaId,
     descricao, valor, dataPrevista:data, status:'Pendente', dataPagamento:null, modeloId:null
   };
   DB.lancamentos.push(novo);
@@ -1489,6 +1565,7 @@ document.getElementById('btnNovoContrato').onclick = ()=>{
   if(DB.clientes.length===0){ toast('Cadastre um cliente antes de criar um contrato'); return; }
   document.getElementById('modalContratoTitle').textContent='Novo contrato';
   document.getElementById('contratoId').value='';
+  document.getElementById('contratoCliente').value='';
   document.getElementById('contratoObjeto').value='';
   document.getElementById('contratoValor').value='';
   document.getElementById('contratoDiaVenc').value='10';
@@ -1504,29 +1581,34 @@ function editarContrato(id){
   const c = DB.contratos.find(x=>x.id===id); if(!c) return;
   document.getElementById('modalContratoTitle').textContent='Editar contrato';
   document.getElementById('contratoId').value=c.id;
-  document.getElementById('contratoCliente').value=c.clienteId;
+  document.getElementById('contratoCliente').value=clienteNome(c.clienteId);
   document.getElementById('contratoObjeto').value=c.objeto;
   document.getElementById('contratoValor').value=c.valorMensal;
   document.getElementById('contratoDiaVenc').value=c.diaVencimento;
   document.getElementById('contratoInicio').value=c.dataInicio;
   document.getElementById('contratoFim').value=c.dataFim||'';
   document.getElementById('contratoStatus').value=c.status;
-  document.getElementById('contratoConta').value=c.contaId||'';
+  document.getElementById('contratoConta').value=c.contaId?contaNome(c.contaId):'';
   document.getElementById('contratoObs').value=c.obs||'';
   openModal('overlayContrato');
 }
 function salvarContrato(){
   if(!canEdit('contratos')) return;
-  const clienteId = document.getElementById('contratoCliente').value;
+  const clienteNomeRaw = document.getElementById('contratoCliente').value.trim();
   const objeto = document.getElementById('contratoObjeto').value.trim();
   const valor = parseFloat(document.getElementById('contratoValor').value);
   const diaVenc = parseInt(document.getElementById('contratoDiaVenc').value);
   const dataInicio = document.getElementById('contratoInicio').value;
-  if(!clienteId){ toast('Selecione o cliente'); return; }
+  if(!clienteNomeRaw){ toast('Selecione o cliente'); return; }
+  const clienteId = findClienteId(clienteNomeRaw);
+  if(clienteId===undefined){ toast('Cliente não encontrado — selecione um da lista'); return; }
   if(!objeto){ toast('Informe o objeto do contrato'); return; }
   if(!valor || valor<=0){ toast('Informe um valor de mensalidade válido'); return; }
   if(!diaVenc || diaVenc<1 || diaVenc>28){ toast('Informe um dia de vencimento válido (1 a 28)'); return; }
   if(!dataInicio){ toast('Informe a data de início da vigência'); return; }
+  const contaNomeRaw = document.getElementById('contratoConta').value.trim();
+  let contaId = null;
+  if(contaNomeRaw){ const found = findContaId(contaNomeRaw); if(found===undefined){ toast('Conta não encontrada — selecione uma da lista ou deixe em branco'); return; } contaId = found; }
   const id = document.getElementById('contratoId').value;
   const data = {
     clienteId, objeto, valorMensal:valor,
@@ -1534,7 +1616,7 @@ function salvarContrato(){
     dataInicio,
     dataFim:document.getElementById('contratoFim').value||null,
     status:document.getElementById('contratoStatus').value,
-    contaId:document.getElementById('contratoConta').value || null,
+    contaId,
     obs:document.getElementById('contratoObs').value
   };
   let rec;
@@ -1628,13 +1710,16 @@ function renderModelos(){
   renderPagination('pagModelos', 'modelos', totalPages, currentPage, total);
   tbody.innerHTML = pageItems.map(m=>{
     const podeEditarLinha = m.tipo==='entrada' ? eEntradas : eSaidas;
+    const contratoIds = getModeloContratoIds(m);
+    const contratoCell = contratoIds.length===0 ? '—' : (contratoIds.length===1 ? contratoLabel(contratoIds[0]) : `${contratoIds.length} contratos vinculados`);
+    const diaCell = contratoIds.length>1 ? 'por contrato' : `dia ${m.dia}`;
     return `<tr>
       <td>${m.descricao}</td>
       <td>${m.tipo==='entrada'?'Entrada':'Saída'}</td>
       <td>${catName(m.categoriaId)}</td>
       <td>${m.contaId?contaNome(m.contaId):'—'}</td>
-      <td>${m.contratoId?contratoLabel(m.contratoId):'—'}</td>
-      <td>dia ${m.dia}</td>
+      <td>${contratoCell}</td>
+      <td>${diaCell}</td>
       <td class="cell-num">${fmtMoney(m.valor)}</td>
       <td><span class="badge ${m.ativo?'badge-green':'badge-gray'}">${m.ativo?'Ativo':'Inativo'}</span></td>
       <td class="row-actions">
@@ -1655,12 +1740,15 @@ document.getElementById('btnNovoModelo').onclick = ()=>{
   tipoSel.disabled = !(eEntradas && eSaidas);
   const tipoPadrao = eEntradas ? 'entrada' : 'saida';
   tipoSel.value = tipoPadrao;
-  refreshCategoriaSelect('modeloCategoria', tipoPadrao);
-  document.getElementById('modeloContrato').value='';
+  refreshCategoriaDatalist('dlCategoriasModelo', tipoPadrao);
+  document.getElementById('modeloCategoria').value='';
   document.getElementById('modeloConta').value='';
   document.getElementById('modeloValor').value='';
   document.getElementById('modeloDia').value='10';
   document.getElementById('modeloAtivo').checked=true;
+  modeloContratoSelecionados = new Set();
+  document.getElementById('modeloContratoBusca').value='';
+  renderModeloContratoLista();
   openModal('overlayModelo');
 };
 function editarModelo(id){
@@ -1674,32 +1762,54 @@ function editarModelo(id){
   tipoSel.innerHTML = `<option value="${m.tipo}">${m.tipo==='entrada'?'Entrada':'Saída'}</option>`;
   tipoSel.value = m.tipo;
   tipoSel.disabled = true;
-  refreshCategoriaSelect('modeloCategoria', m.tipo);
-  document.getElementById('modeloCategoria').value=m.categoriaId;
-  document.getElementById('modeloContrato').value=m.contratoId||'';
-  document.getElementById('modeloConta').value=m.contaId||'';
+  refreshCategoriaDatalist('dlCategoriasModelo', m.tipo);
+  document.getElementById('modeloCategoria').value=catName(m.categoriaId);
+  const idsExistentes = getModeloContratoIds(m);
+  let contaParaExibir = m.contaId;
+  if(!contaParaExibir && idsExistentes.length){
+    const primeiro = DB.contratos.find(c=>c.id===idsExistentes[0]);
+    if(primeiro && primeiro.contaId) contaParaExibir = primeiro.contaId;
+  }
+  document.getElementById('modeloConta').value = contaParaExibir ? contaNome(contaParaExibir) : '';
   document.getElementById('modeloValor').value=m.valor;
-  document.getElementById('modeloDia').value=m.dia;
+  document.getElementById('modeloDia').value=m.dia||10;
   document.getElementById('modeloAtivo').checked=m.ativo;
+  modeloContratoSelecionados = new Set(idsExistentes);
+  document.getElementById('modeloContratoBusca').value='';
+  renderModeloContratoLista();
   openModal('overlayModelo');
 }
 function salvarModelo(){
   const descricao = document.getElementById('modeloDescricao').value.trim();
-  const categoriaId = document.getElementById('modeloCategoria').value;
-  const valor = parseFloat(document.getElementById('modeloValor').value);
-  const dia = parseInt(document.getElementById('modeloDia').value);
-  if(!descricao){ toast('Informe a descrição'); return; }
-  if(!categoriaId){ toast('Selecione a categoria'); return; }
-  if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
-  if(!dia || dia<1 || dia>28){ toast('Informe um dia do mês válido (1 a 28)'); return; }
   const tipo = document.getElementById('modeloTipo').value;
+  const categoriaNomeRaw = document.getElementById('modeloCategoria').value.trim();
+  if(!descricao){ toast('Informe a descrição'); return; }
+  if(!categoriaNomeRaw){ toast('Selecione a categoria'); return; }
+  const categoriaId = findCategoriaId(categoriaNomeRaw, tipo);
+  if(categoriaId===undefined){ toast('Categoria não encontrada para esse tipo — selecione uma da lista'); return; }
   const key = tipo==='entrada' ? 'modelosEntradas' : 'modelosSaidas';
   if(!canEdit(key)){ toast('Sem permissão para salvar'); return; }
+
+  const contaNomeRaw = document.getElementById('modeloConta').value.trim();
+  let contaId = null;
+  if(contaNomeRaw){ const found = findContaId(contaNomeRaw); if(found===undefined){ toast('Conta não encontrada — selecione uma da lista ou deixe em branco'); return; } contaId = found; }
+
+  const contratoIds = getSelectedModeloContratoIds();
+  let valor, dia;
+  if(contratoIds.length > 0){
+    valor = contratoIds.reduce((s,cid)=>{ const c=DB.contratos.find(x=>x.id===cid); return s + (c?c.valorMensal:0); }, 0);
+    dia = null;
+  }else{
+    valor = parseFloat(document.getElementById('modeloValor').value);
+    dia = parseInt(document.getElementById('modeloDia').value);
+    if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
+    if(!dia || dia<1 || dia>28){ toast('Informe um dia do mês válido (1 a 28)'); return; }
+  }
   const id = document.getElementById('modeloId').value;
   const data = {
     descricao, tipo, categoriaId,
-    contratoId:document.getElementById('modeloContrato').value || null,
-    contaId:document.getElementById('modeloConta').value || null,
+    contratoIds, contratoId: contratoIds[0]||null,
+    contaId,
     valor, dia,
     ativo:document.getElementById('modeloAtivo').checked
   };
