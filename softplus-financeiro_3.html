@@ -268,7 +268,7 @@
         <div class="view-desc">Entradas e saídas, geradas dos modelos recorrentes ou lançadas manualmente</div>
       </div>
       <div style="display:flex; gap:8px;">
-        <button class="btn" id="btnGerarMes"><i>&#8635;</i> Gerar lançamentos do mês</button>
+        <button class="btn" id="btnGerarMes" title="Gera para o mês e ano selecionados nos filtros abaixo"><i>&#8635;</i> Gerar lançamentos do mês</button>
         <button class="btn btn-primary" id="btnNovoLancamento">+ Lançamento manual</button>
       </div>
     </div>
@@ -1341,8 +1341,11 @@ function confirmarLancamento(id){
 /* ---------- GERAR LANÇAMENTOS DO MÊS ---------- */
 document.getElementById('btnGerarMes').onclick = async ()=>{
   if(!(isAdmin() || (canEdit('lancEntradas') && canEdit('lancSaidas')))){ toast('Sem permissão para gerar lançamentos'); return; }
-  const comp = currentComp();
-  const [ano,mes] = comp.split('-');
+  const mesSel = document.getElementById('filtroMes').value;
+  const anoSel = document.getElementById('filtroAno').value;
+  if(!mesSel || !anoSel){ toast('Selecione o mês e o ano (nos filtros acima) para gerar os lançamentos'); return; }
+  const comp = `${anoSel}-${mesSel}`;
+  const [ano,mes] = [anoSel, mesSel];
   const ativos = DB.modelos.filter(m=>m.ativo);
   const novos = [];
   ativos.forEach(m=>{
