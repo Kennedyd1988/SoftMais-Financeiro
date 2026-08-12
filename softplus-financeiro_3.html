@@ -362,7 +362,7 @@
     </div>
     <div class="card table-scroll" style="padding:0;">
       <table id="modelosTable">
-        <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Conta</th><th>Cliente/Contrato</th><th>Dia venc.</th><th style="text-align:right">Valor</th><th>Ativo</th><th></th></tr></thead>
+        <thead><tr><th>Descrição</th><th>Tipo</th><th>Categoria</th><th>Conta</th><th>Cliente/Contrato</th><th>Vencimento (mês atual)</th><th style="text-align:right">Valor</th><th>Ativo</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -1693,6 +1693,26 @@ function excluirCliente(id){
 }
 
 /* ---------- MODELOS RECORRENTES ---------- */
+function vencimentoModelo(m, anoMes){
+  const [ano, mes] = anoMes.split('-');
+  const ids = getModeloContratoIds(m);
+  if(ids.length===0){
+    const dia = String(m.dia||10).padStart(2,'0');
+    return `${dia}/${mes}/${ano}`;
+  }
+  if(ids.length===1){
+    const c = DB.contratos.find(x=>x.id===ids[0]);
+    const dia = String((c && c.diaVencimento) || 10).padStart(2,'0');
+    return `${dia}/${mes}/${ano}`;
+  }
+  const datas = ids.map(id=>{
+    const c = DB.contratos.find(x=>x.id===id);
+    const dia = String((c && c.diaVencimento) || 10).padStart(2,'0');
+    return `${dia}/${mes}`;
+  });
+  return Array.from(new Set(datas)).sort().join(', ') + `/${ano}`;
+}
+
 function renderModelos(){
   const vEntradas = canView('modelosEntradas'), vSaidas = canView('modelosSaidas');
   const eEntradas = canEdit('modelosEntradas'), eSaidas = canEdit('modelosSaidas');
@@ -1706,20 +1726,21 @@ function renderModelos(){
     document.getElementById('pagModelos').innerHTML = '';
     return;
   }
+  const anoMesAtual = new Date().toISOString().slice(0,7);
   const { pageItems, totalPages, currentPage, total } = paginate(list, 'modelos');
   renderPagination('pagModelos', 'modelos', totalPages, currentPage, total);
   tbody.innerHTML = pageItems.map(m=>{
     const podeEditarLinha = m.tipo==='entrada' ? eEntradas : eSaidas;
     const contratoIds = getModeloContratoIds(m);
     const contratoCell = contratoIds.length===0 ? '—' : (contratoIds.length===1 ? contratoLabel(contratoIds[0]) : `${contratoIds.length} contratos vinculados`);
-    const diaCell = contratoIds.length>1 ? 'por contrato' : `dia ${m.dia}`;
+    const vencimentoCell = vencimentoModelo(m, anoMesAtual);
     return `<tr>
       <td>${m.descricao}</td>
       <td>${m.tipo==='entrada'?'Entrada':'Saída'}</td>
       <td>${catName(m.categoriaId)}</td>
       <td>${m.contaId?contaNome(m.contaId):'—'}</td>
       <td>${contratoCell}</td>
-      <td>${diaCell}</td>
+      <td>${vencimentoCell}</td>
       <td class="cell-num">${fmtMoney(m.valor)}</td>
       <td><span class="badge ${m.ativo?'badge-green':'badge-gray'}">${m.ativo?'Ativo':'Inativo'}</span></td>
       <td class="row-actions">
