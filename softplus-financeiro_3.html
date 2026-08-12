@@ -268,6 +268,7 @@
         <div class="view-desc">Entradas e saídas, geradas dos modelos recorrentes ou lançadas manualmente</div>
       </div>
       <div style="display:flex; gap:8px;">
+        <select id="gerarTipoSel" title="O que gerar"></select>
         <button class="btn" id="btnGerarMes" title="Gera para o mês e ano selecionados nos filtros abaixo"><i>&#8635;</i> Gerar lançamentos do mês</button>
         <button class="btn btn-primary" id="btnNovoLancamento">+ Lançamento manual</button>
       </div>
@@ -1337,16 +1338,28 @@ function confirmarLancamento(id){
   l.status='Pago'; l.dataPagamento=todayISO();
   saveRecord('lancamentos', l).then(()=>{ toast('Lançamento confirmado'); renderAll(); });
 }
+function reverterLancamento(id){
+  const l = DB.lancamentos.find(x=>x.id===id);
+  if(!l) return;
+  const key = l.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas';
+  if(!canEdit(key)){ toast('Sem permissão para editar'); return; }
+  l.status='Pendente'; l.dataPagamento=null;
+  saveRecord('lancamentos', l).then(()=>{ toast('Lançamento revertido para pendente'); renderAll(); });
+}
 
 /* ---------- GERAR LANÇAMENTOS DO MÊS ---------- */
 document.getElementById('btnGerarMes').onclick = async ()=>{
-  if(!(isAdmin() || (canEdit('lancEntradas') && canEdit('lancSaidas')))){ toast('Sem permissão para gerar lançamentos'); return; }
+  const tipoGerar = document.getElementById('gerarTipoSel').value; // 'ambos' | 'entrada' | 'saida'
+  const podeEntradas = canEdit('lancEntradas'), podeSaidas = canEdit('lancSaidas');
+  if(tipoGerar==='entrada' && !podeEntradas){ toast('Sem permissão para gerar entradas'); return; }
+  if(tipoGerar==='saida' && !podeSaidas){ toast('Sem permissão para gerar saídas'); return; }
+  if(tipoGerar==='ambos' && !(podeEntradas && podeSaidas)){ toast('Sem permissão para gerar entradas e saídas'); return; }
   const mesSel = document.getElementById('filtroMes').value;
   const anoSel = document.getElementById('filtroAno').value;
   if(!mesSel || !anoSel){ toast('Selecione o mês e o ano (nos filtros acima) para gerar os lançamentos'); return; }
   const comp = `${anoSel}-${mesSel}`;
   const [ano,mes] = [anoSel, mesSel];
-  const ativos = DB.modelos.filter(m=>m.ativo);
+  const ativos = DB.modelos.filter(m=>m.ativo && (tipoGerar==='ambos' || m.tipo===tipoGerar));
   const novos = [];
   ativos.forEach(m=>{
     const contratoIds = getModeloContratoIds(m);
@@ -1383,7 +1396,8 @@ document.getElementById('btnGerarMes').onclick = async ()=>{
   });
   await saveBatch('lancamentos', novos);
   const gerados = novos.length;
-  toast(gerados>0 ? `${gerados} lançamento(s) gerado(s) para ${monthLabel(comp)}` : 'Nenhum lançamento novo — já gerados ou sem modelos ativos');
+  const rotulo = tipoGerar==='entrada' ? 'de entrada ' : tipoGerar==='saida' ? 'de saída ' : '';
+  toast(gerados>0 ? `${gerados} lançamento(s) ${rotulo}gerado(s) para ${monthLabel(comp)}` : 'Nenhum lançamento novo — já gerados ou sem modelos ativos');
   renderAll();
 };
 
@@ -1436,7 +1450,16 @@ function renderLancamentos(){
   filtroTipoSel.value = tipoFiltro && ((tipoFiltro==='entrada' && vEntradas) || (tipoFiltro==='saida' && vSaidas)) ? tipoFiltro : '';
 
   document.getElementById('btnNovoLancamento').style.display = (eEntradas || eSaidas) ? '' : 'none';
-  document.getElementById('btnGerarMes').style.display = (isAdmin() || (eEntradas && eSaidas)) ? '' : 'none';
+  const gerarSel = document.getElementById('gerarTipoSel');
+  document.getElementById('btnGerarMes').style.display = (eEntradas || eSaidas) ? '' : 'none';
+  gerarSel.style.display = (eEntradas || eSaidas) ? '' : 'none';
+  if(eEntradas && eSaidas){
+    gerarSel.innerHTML = '<option value="ambos">Entradas e saídas</option><option value="entrada">Somente entradas</option><option value="saida">Somente saídas</option>';
+  }else if(eEntradas){
+    gerarSel.innerHTML = '<option value="entrada">Somente entradas</option>';
+  }else if(eSaidas){
+    gerarSel.innerHTML = '<option value="saida">Somente saídas</option>';
+  }
   document.getElementById('btnImportarLancamentos').style.display = (eEntradas || eSaidas) ? '' : 'none';
 
   let list = [...DB.lancamentos].sort((a,b)=>b.dataPrevista.localeCompare(a.dataPrevista));
@@ -1473,6 +1496,7 @@ function renderLancamentos(){
       <td class="cell-num" style="color:${l.tipo==='entrada'?'var(--green)':'var(--red)'}">${l.tipo==='entrada'?'+':'-'} ${fmtMoney(l.valor)}</td>
       <td class="row-actions">
         ${(podeEditarLinha && l.status==='Pendente')?`<button class="icon-btn" title="Confirmar" onclick="confirmarLancamento('${l.id}')">✓</button>`:''}
+        ${(podeEditarLinha && l.status==='Pago')?`<button class="icon-btn" title="Reverter para pendente" onclick="reverterLancamento('${l.id}')">↺</button>`:''}
         ${podeEditarLinha?`<button class="icon-btn" title="Excluir" onclick="excluirLancamento('${l.id}')">✕</button>`:''}
       </td>
     </tr>`;
