@@ -267,9 +267,10 @@
         <div class="view-title">Lançamentos</div>
         <div class="view-desc">Entradas e saídas, geradas dos modelos recorrentes ou lançadas manualmente</div>
       </div>
-      <div style="display:flex; gap:8px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <select id="gerarTipoSel" title="O que gerar"></select>
         <button class="btn" id="btnGerarMes" title="Gera para o mês e ano selecionados nos filtros abaixo"><i>&#8635;</i> Gerar lançamentos do mês</button>
+        <button class="btn" id="btnTransferencia">↔ Transferir entre contas</button>
         <button class="btn btn-primary" id="btnNovoLancamento">+ Lançamento manual</button>
       </div>
     </div>
@@ -452,6 +453,29 @@
   </section>
 
 </main>
+
+<!-- MODAL TRANSFERENCIA -->
+<div class="overlay" id="overlayTransferencia">
+  <div class="modal">
+    <h3>Transferir entre contas</h3>
+    <div class="field"><label>Conta de origem (será debitada) <span class="required-mark">*</span></label>
+      <input type="text" id="transfOrigem" list="dlContas" placeholder="Digite para buscar..." autocomplete="off" required>
+    </div>
+    <div class="field"><label>Conta de destino (será creditada) <span class="required-mark">*</span></label>
+      <input type="text" id="transfDestino" list="dlContas" placeholder="Digite para buscar..." autocomplete="off" required>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="transfValor" required></div>
+      <div class="field"><label>Data <span class="required-mark">*</span></label><input type="date" id="transfData" required></div>
+    </div>
+    <div class="field"><label>Observação (opcional)</label><input type="text" id="transfObs" placeholder="Ex: reforço de caixa"></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios — gera automaticamente uma saída na origem e uma entrada no destino, já conciliadas</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('overlayTransferencia')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarTransferencia()">Transferir</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL CONTA -->
 <div class="overlay" id="overlayConta">
@@ -736,6 +760,29 @@ function seedCategoriasIfNeeded(){
   }
 }
 
+const TRANSFER_CATEGORIA_NOME = 'Transferência entre contas';
+function ensureTransferCategorias(){
+  if(window._transferCatChecked) return;
+  window._transferCatChecked = true;
+  const faltantes = [];
+  if(!DB.categorias.some(c=>c.nome===TRANSFER_CATEGORIA_NOME && c.tipo==='entrada')){
+    faltantes.push({id:uid(), nome:TRANSFER_CATEGORIA_NOME, tipo:'entrada'});
+  }
+  if(!DB.categorias.some(c=>c.nome===TRANSFER_CATEGORIA_NOME && c.tipo==='saida')){
+    faltantes.push({id:uid(), nome:TRANSFER_CATEGORIA_NOME, tipo:'saida'});
+  }
+  if(faltantes.length){
+    faltantes.forEach(c=>DB.categorias.push(c));
+    saveBatch('categorias', faltantes);
+  }
+}
+function getTransferCategorias(){
+  return {
+    catEntrada: DB.categorias.find(c=>c.nome===TRANSFER_CATEGORIA_NOME && c.tipo==='entrada'),
+    catSaida: DB.categorias.find(c=>c.nome===TRANSFER_CATEGORIA_NOME && c.tipo==='saida')
+  };
+}
+
 async function migrateTableIfNeeded(key){
   if(window['_migrated_'+key]) return;
   window['_migrated_'+key] = true;
@@ -759,6 +806,7 @@ function appStart(){
       loadedTables.add(k);
       if(loadedTables.size===TABLE_KEYS.length){
         if(!window._seeded){ window._seeded = true; seedCategoriasIfNeeded(); }
+        ensureTransferCategorias();
         resolveCurrentUser();
       } else if(k==='usuarios'){
         resolveCurrentUser();
@@ -1257,6 +1305,7 @@ function renderDashboard(){
 
   let lancComp = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp);
   if(contaFiltro) lancComp = lancComp.filter(l=>l.contaId===contaFiltro);
+  else lancComp = lancComp.filter(l=>!l.transferencia);
   const impostoId = catImpostoId();
 
   const entradasPagas = lancComp.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
@@ -1345,6 +1394,57 @@ function reverterLancamento(id){
   if(!canEdit(key)){ toast('Sem permissão para editar'); return; }
   l.status='Pendente'; l.dataPagamento=null;
   saveRecord('lancamentos', l).then(()=>{ toast('Lançamento revertido para pendente'); renderAll(); });
+}
+
+/* ---------- TRANSFERÊNCIA ENTRE CONTAS ---------- */
+function podeTransferir(){ return isAdmin() || (canEdit('lancEntradas') && canEdit('lancSaidas')); }
+document.getElementById('btnTransferencia').onclick = ()=>{
+  if(!podeTransferir()) return;
+  if(DB.contas.length < 2){ toast('Cadastre pelo menos duas contas para transferir entre elas'); return; }
+  document.getElementById('transfOrigem').value='';
+  document.getElementById('transfDestino').value='';
+  document.getElementById('transfValor').value='';
+  document.getElementById('transfData').value=todayISO();
+  document.getElementById('transfObs').value='';
+  openModal('overlayTransferencia');
+};
+function salvarTransferencia(){
+  if(!podeTransferir()) return;
+  const origemNomeRaw = document.getElementById('transfOrigem').value.trim();
+  const destinoNomeRaw = document.getElementById('transfDestino').value.trim();
+  const valor = parseFloat(document.getElementById('transfValor').value);
+  const data = document.getElementById('transfData').value;
+  const obs = document.getElementById('transfObs').value.trim();
+  if(!origemNomeRaw){ toast('Selecione a conta de origem'); return; }
+  const origemId = findContaId(origemNomeRaw);
+  if(origemId===undefined){ toast('Conta de origem não encontrada — selecione uma da lista'); return; }
+  if(!destinoNomeRaw){ toast('Selecione a conta de destino'); return; }
+  const destinoId = findContaId(destinoNomeRaw);
+  if(destinoId===undefined){ toast('Conta de destino não encontrada — selecione uma da lista'); return; }
+  if(origemId===destinoId){ toast('A conta de origem e a de destino devem ser diferentes'); return; }
+  if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
+  if(!data){ toast('Informe a data'); return; }
+  const {catEntrada, catSaida} = getTransferCategorias();
+  if(!catEntrada || !catSaida){ toast('Preparando categorias de transferência, tente novamente em instantes'); return; }
+
+  const grupoId = uid();
+  const descBase = obs || `Transferência: ${contaNome(origemId)} → ${contaNome(destinoId)}`;
+  const saidaRec = {
+    id:uid(), tipo:'saida', categoriaId:catSaida.id, contratoId:null, contaId:origemId,
+    descricao:`${descBase} (saída)`, valor, dataPrevista:data, status:'Pago', dataPagamento:data,
+    modeloId:null, transferencia:true, transferGrupoId:grupoId
+  };
+  const entradaRec = {
+    id:uid(), tipo:'entrada', categoriaId:catEntrada.id, contratoId:null, contaId:destinoId,
+    descricao:`${descBase} (entrada)`, valor, dataPrevista:data, status:'Pago', dataPagamento:data,
+    modeloId:null, transferencia:true, transferGrupoId:grupoId
+  };
+  DB.lancamentos.push(saidaRec, entradaRec);
+  saveBatch('lancamentos', [saidaRec, entradaRec]).then(()=>{
+    closeModal('overlayTransferencia');
+    toast(`Transferência de ${fmtMoney(valor)} entre contas realizada`);
+    renderAll();
+  });
 }
 
 /* ---------- GERAR LANÇAMENTOS DO MÊS ---------- */
@@ -1461,6 +1561,7 @@ function renderLancamentos(){
     gerarSel.innerHTML = '<option value="saida">Somente saídas</option>';
   }
   document.getElementById('btnImportarLancamentos').style.display = (eEntradas || eSaidas) ? '' : 'none';
+  document.getElementById('btnTransferencia').style.display = podeTransferir() ? '' : 'none';
 
   let list = [...DB.lancamentos].sort((a,b)=>b.dataPrevista.localeCompare(a.dataPrevista));
   list = list.filter(l => (l.tipo==='entrada' && vEntradas) || (l.tipo==='saida' && vSaidas));
@@ -1485,8 +1586,9 @@ function renderLancamentos(){
       ? `<span class="badge badge-green">${l.tipo==='entrada'?'Recebido':'Pago'}</span>`
       : (atrasado ? `<span class="badge badge-red">Atrasado</span>` : `<span class="badge badge-amber">Pendente</span>`);
     const podeEditarLinha = l.tipo==='entrada' ? eEntradas : eSaidas;
+    const transferTag = l.transferencia ? ` <span class="badge badge-gray" title="Gerado por transferência entre contas">↔ transferência</span>` : '';
     return `<tr>
-      <td>${l.descricao}</td>
+      <td>${l.descricao}${transferTag}</td>
       <td>${l.tipo==='entrada'?'Entrada':'Saída'}</td>
       <td>${catName(l.categoriaId)}</td>
       <td>${l.contaId?contaNome(l.contaId):'—'}</td>
@@ -1495,8 +1597,8 @@ function renderLancamentos(){
       <td>${statusBadge}</td>
       <td class="cell-num" style="color:${l.tipo==='entrada'?'var(--green)':'var(--red)'}">${l.tipo==='entrada'?'+':'-'} ${fmtMoney(l.valor)}</td>
       <td class="row-actions">
-        ${(podeEditarLinha && l.status==='Pendente')?`<button class="icon-btn" title="Confirmar" onclick="confirmarLancamento('${l.id}')">✓</button>`:''}
-        ${(podeEditarLinha && l.status==='Pago')?`<button class="icon-btn" title="Reverter para pendente" onclick="reverterLancamento('${l.id}')">↺</button>`:''}
+        ${(podeEditarLinha && l.status==='Pendente' && !l.transferencia)?`<button class="icon-btn" title="Confirmar" onclick="confirmarLancamento('${l.id}')">✓</button>`:''}
+        ${(podeEditarLinha && l.status==='Pago' && !l.transferencia)?`<button class="icon-btn" title="Reverter para pendente" onclick="reverterLancamento('${l.id}')">↺</button>`:''}
         ${podeEditarLinha?`<button class="icon-btn" title="Excluir" onclick="excluirLancamento('${l.id}')">✕</button>`:''}
       </td>
     </tr>`;
@@ -1509,6 +1611,16 @@ function renderLancamentos(){
 function excluirLancamento(id){
   const l = DB.lancamentos.find(x=>x.id===id);
   if(l){ const key = l.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas'; if(!canEdit(key)){ toast('Sem permissão para excluir'); return; } }
+  if(l && l.transferencia && l.transferGrupoId){
+    const par = DB.lancamentos.find(x=>x.transferGrupoId===l.transferGrupoId && x.id!==l.id);
+    if(par){
+      const key2 = par.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas';
+      if(!canEdit(key2)){ toast('Sem permissão para excluir os dois lados da transferência'); return; }
+      DB.lancamentos = DB.lancamentos.filter(x=>x.id!==l.id && x.id!==par.id);
+      Promise.all([deleteRecord('lancamentos', l.id), deleteRecord('lancamentos', par.id)]).then(()=>{ toast('Transferência excluída (os dois lados)'); renderAll(); });
+      return;
+    }
+  }
   DB.lancamentos = DB.lancamentos.filter(x=>x.id!==id);
   deleteRecord('lancamentos', id).then(()=>{ toast('Lançamento excluído'); renderAll(); });
 }
@@ -1887,6 +1999,7 @@ function resumoMes(comp, contaId){
   const impostoId = catImpostoId();
   let list = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago');
   if(contaId) list = list.filter(l=>l.contaId===contaId);
+  else list = list.filter(l=>!l.transferencia);
   const entradas = list.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
   const impostos = list.filter(l=>l.tipo==='saida' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
   const saidas = list.filter(l=>l.tipo==='saida' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
