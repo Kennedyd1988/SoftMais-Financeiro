@@ -583,7 +583,7 @@
 <!-- MODAL LANÇAMENTO -->
 <div class="overlay" id="overlayLancamento">
   <div class="modal">
-    <h3>Novo lançamento manual</h3>
+    <h3 id="modalLancamentoTitle">Novo lançamento manual</h3>
     <input type="hidden" id="lancamentoId">
     <div class="field"><label>Descrição <span class="required-mark">*</span></label><input type="text" id="lancDescricao" required></div>
     <div class="field-row">
@@ -1597,6 +1597,7 @@ function renderLancamentos(){
       <td>${statusBadge}</td>
       <td class="cell-num" style="color:${l.tipo==='entrada'?'var(--green)':'var(--red)'}">${l.tipo==='entrada'?'+':'-'} ${fmtMoney(l.valor)}</td>
       <td class="row-actions">
+        ${(podeEditarLinha && !l.transferencia)?`<button class="icon-btn" title="Editar" onclick="editarLancamento('${l.id}')">✎</button>`:''}
         ${(podeEditarLinha && l.status==='Pendente' && !l.transferencia)?`<button class="icon-btn" title="Confirmar" onclick="confirmarLancamento('${l.id}')">✓</button>`:''}
         ${(podeEditarLinha && l.status==='Pago' && !l.transferencia)?`<button class="icon-btn" title="Reverter para pendente" onclick="reverterLancamento('${l.id}')">↺</button>`:''}
         ${podeEditarLinha?`<button class="icon-btn" title="Excluir" onclick="excluirLancamento('${l.id}')">✕</button>`:''}
@@ -1626,6 +1627,7 @@ function excluirLancamento(id){
 }
 
 document.getElementById('btnNovoLancamento').onclick = ()=>{
+  document.getElementById('modalLancamentoTitle').textContent='Novo lançamento manual';
   document.getElementById('lancamentoId').value='';
   document.getElementById('lancDescricao').value='';
   const eEntradas = canEdit('lancEntradas'), eSaidas = canEdit('lancSaidas');
@@ -1642,6 +1644,27 @@ document.getElementById('btnNovoLancamento').onclick = ()=>{
   document.getElementById('lancData').value=todayISO();
   openModal('overlayLancamento');
 };
+function editarLancamento(id){
+  const l = DB.lancamentos.find(x=>x.id===id);
+  if(!l) return;
+  const key = l.tipo==='entrada' ? 'lancEntradas' : 'lancSaidas';
+  if(!canEdit(key)) return;
+  if(l.transferencia){ toast('Transferências não podem ser editadas — exclua e crie novamente se precisar corrigir'); return; }
+  document.getElementById('modalLancamentoTitle').textContent='Editar lançamento';
+  document.getElementById('lancamentoId').value=l.id;
+  document.getElementById('lancDescricao').value=l.descricao;
+  const tipoSel = document.getElementById('lancTipo');
+  tipoSel.innerHTML = `<option value="${l.tipo}">${l.tipo==='entrada'?'Entrada':'Saída'}</option>`;
+  tipoSel.value = l.tipo;
+  tipoSel.disabled = true;
+  refreshCategoriaDatalist('dlCategoriasLanc', l.tipo);
+  document.getElementById('lancCategoria').value=catName(l.categoriaId);
+  document.getElementById('lancContrato').value=l.contratoId?contratoLabel(l.contratoId):'';
+  document.getElementById('lancConta').value=l.contaId?contaNome(l.contaId):'';
+  document.getElementById('lancValor').value=l.valor;
+  document.getElementById('lancData').value=l.dataPrevista;
+  openModal('overlayLancamento');
+}
 function salvarLancamento(){
   const descricao = document.getElementById('lancDescricao').value.trim();
   const tipo = document.getElementById('lancTipo').value;
@@ -1660,13 +1683,19 @@ function salvarLancamento(){
   const contaNomeRaw = document.getElementById('lancConta').value.trim();
   let contaId = null;
   if(contaNomeRaw){ const found = findContaId(contaNomeRaw); if(found===undefined){ toast('Conta não encontrada — selecione uma da lista ou deixe em branco'); return; } contaId = found; }
-  const novo = {
-    id:uid(), tipo,
-    categoriaId, contratoId, contaId,
-    descricao, valor, dataPrevista:data, status:'Pendente', dataPagamento:null, modeloId:null
-  };
-  DB.lancamentos.push(novo);
-  saveRecord('lancamentos', novo).then(()=>{ closeModal('overlayLancamento'); toast('Lançamento adicionado'); renderAll(); });
+
+  const id = document.getElementById('lancamentoId').value;
+  const dadosComuns = { tipo, categoriaId, contratoId, contaId, descricao, valor, dataPrevista:data };
+  let rec;
+  if(id){
+    rec = DB.lancamentos.find(x=>x.id===id);
+    if(!rec){ toast('Lançamento não encontrado'); return; }
+    Object.assign(rec, dadosComuns);
+  }else{
+    rec = { id:uid(), ...dadosComuns, status:'Pendente', dataPagamento:null, modeloId:null };
+    DB.lancamentos.push(rec);
+  }
+  saveRecord('lancamentos', rec).then(()=>{ closeModal('overlayLancamento'); toast(id?'Lançamento atualizado':'Lançamento adicionado'); renderAll(); });
 }
 
 /* ---------- CONTRATOS ---------- */
