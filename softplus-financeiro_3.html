@@ -847,6 +847,14 @@ function contaEntraNoGeral(contaId){
   const c = DB.contas.find(x=>x.id===contaId);
   return c ? (c.considerarGeral !== false) : true;
 }
+function lancamentoEntraNoConsolidado(l){
+  if(!l.transferencia) return contaEntraNoGeral(l.contaId);
+  const geralAqui = contaEntraNoGeral(l.contaId);
+  const par = DB.lancamentos.find(x=>x.transferGrupoId===l.transferGrupoId && x.id!==l.id);
+  const geralLa = par ? contaEntraNoGeral(par.contaId) : true;
+  if(geralAqui === geralLa) return false; // mesma "família" de contas — movimento interno, neutro
+  return geralAqui; // atravessou a fronteira — conta só do lado "no geral"
+}
 
 /* ---------- CSV ENGINE (Exportar / Importar / Modelo) ---------- */
 function csvEscape(v){
@@ -1312,7 +1320,7 @@ function renderDashboard(){
 
   let lancComp = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp);
   if(contaFiltro) lancComp = lancComp.filter(l=>l.contaId===contaFiltro);
-  else lancComp = lancComp.filter(l=>!l.transferencia && contaEntraNoGeral(l.contaId));
+  else lancComp = lancComp.filter(l=>lancamentoEntraNoConsolidado(l));
   const impostoId = catImpostoId();
 
   const entradasPagas = lancComp.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
@@ -2037,7 +2045,7 @@ function resumoMes(comp, contaId){
   const impostoId = catImpostoId();
   let list = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago');
   if(contaId) list = list.filter(l=>l.contaId===contaId);
-  else list = list.filter(l=>!l.transferencia && contaEntraNoGeral(l.contaId));
+  else list = list.filter(l=>lancamentoEntraNoConsolidado(l));
   const entradas = list.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
   const impostos = list.filter(l=>l.tipo==='saida' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
   const saidas = list.filter(l=>l.tipo==='saida' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
