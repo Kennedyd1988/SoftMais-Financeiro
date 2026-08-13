@@ -542,7 +542,8 @@
       <datalist id="dlSocios"></datalist>
     </div>
     <div class="field"><label>Conta de origem (será debitada) <span class="required-mark">*</span></label>
-      <input type="text" id="retiradaConta" list="dlContas" placeholder="Digite para buscar..." autocomplete="off" required>
+      <input type="text" id="retiradaConta" list="dlContasGeral" placeholder="Digite para buscar... (só contas 'no geral')" autocomplete="off" required>
+      <datalist id="dlContasGeral"></datalist>
     </div>
     <div class="field-row">
       <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="retiradaValor" required></div>
@@ -1410,6 +1411,7 @@ function fillSelects(){
   // Campos com busca + ordem alfabética (texto + datalist, resolvidos por nome ao salvar)
   fillDatalist('dlClientes', sortByLabel(DB.clientes, c=>c.nome).map(c=>c.nome));
   fillDatalist('dlContas', sortByLabel(DB.contas, c=>c.nome).map(c=>c.nome));
+  fillDatalist('dlContasGeral', sortByLabel(DB.contas.filter(c=>c.considerarGeral!==false), c=>c.nome).map(c=>c.nome));
   fillDatalist('dlContratos', sortByLabel(DB.contratos, c=>contratoLabel(c.id)).map(c=>contratoLabel(c.id)));
   fillDatalist('dlEmpresas', sortByLabel(DB.empresas, e=>e.nome).map(e=>e.nome));
   fillDatalist('dlSocios', sortByLabel(DB.socios, s=>s.nome).map(s=>s.nome));
@@ -1713,42 +1715,6 @@ document.getElementById('btnExportarPDF').onclick = ()=>{
   catch(e){ console.error('Erro ao gerar PDF', e); toast('Erro ao gerar o PDF'); }
 };
 
-function tabelaLancamentos(doc, y, titulo, lista){
-  doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text(`${titulo} (${lista.length})`, 40, y); y+=6;
-  doc.autoTable({
-    startY: y+6,
-    head:[['Data','Descricao','Tipo','Categoria','Conta','Status','Valor']],
-    body: lista.length ? [...lista].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
-      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), l.contaId?contaNome(l.contaId):'-', l.status, fmtMoney(l.valor)
-    ]) : [['-','Nenhum lancamento','','','','','']],
-    theme:'striped', styles:{fontSize:8, cellPadding:3, overflow:'linebreak'}, headStyles:{fillColor:[13,79,196]},
-    columnStyles:{
-      0:{cellWidth:52}, 1:{cellWidth:'auto'}, 2:{cellWidth:42}, 3:{cellWidth:95},
-      4:{cellWidth:60}, 5:{cellWidth:48}, 6:{cellWidth:62, halign:'right'}
-    }
-  });
-  return doc.lastAutoTable.finalY + 18;
-}
-function tabelaPendencias(doc, y, titulo, lista, corCabecalho, comSituacao, hoje){
-  doc.setFont('helvetica','bold'); doc.setFontSize(11);
-  doc.text(`${titulo} (${lista.length})`, 40, y); y+=6;
-  const head = comSituacao ? ['Vencimento','Descricao','Tipo','Categoria','Situacao','Valor'] : ['Vencimento','Descricao','Tipo','Categoria','Valor'];
-  const body = lista.length ? [...lista].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>{
-    const linha = [fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId)];
-    if(comSituacao) linha.push(l.dataPrevista<hoje?'Atrasado':'No prazo');
-    linha.push(fmtMoney(l.valor));
-    return linha;
-  }) : [comSituacao ? ['-','Nenhuma pendencia','','','',''] : ['-','Nenhuma pendencia','','','']];
-  const colStyles = comSituacao
-    ? {0:{cellWidth:60},2:{cellWidth:42},3:{cellWidth:95},4:{cellWidth:55},5:{cellWidth:62,halign:'right'}}
-    : {0:{cellWidth:60},2:{cellWidth:42},3:{cellWidth:95},4:{cellWidth:62,halign:'right'}};
-  doc.autoTable({
-    startY:y+6, head:[head], body,
-    theme:'striped', styles:{fontSize:8, cellPadding:3, overflow:'linebreak'}, headStyles:{fillColor:corCabecalho}, columnStyles:colStyles
-  });
-  return doc.lastAutoTable.finalY + 18;
-}
 function resumoFinanceiro(lista, impostoId){
   const entradas = lista.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
   const saidas = lista.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
@@ -1759,121 +1725,170 @@ function quebrarPaginaSeNecessario(doc, y, limite){
   if(y > limite){ doc.addPage(); return 40; }
   return y;
 }
+function empresaDaConta(contaId){
+  if(!contaId) return 'Sem empresa';
+  const c = DB.contas.find(x=>x.id===contaId);
+  if(!c || !c.empresaId) return 'Sem empresa';
+  return empresaNome(c.empresaId);
+}
+function totalFoot(colSpan, valor, corTexto){
+  return [[{content:'TOTAL', colSpan, styles:{halign:'right', fontStyle:'bold'}}, {content:fmtMoney(valor), styles:{halign:'right', fontStyle:'bold', textColor:corTexto||[15,41,71]}}]];
+}
 
 function exportarRelatorioPDF(){
   const comp = currentComp();
   const ano = comp.slice(0,4);
-  const empresaFiltro = document.getElementById('dashEmpresaFiltro').value;
-  const contaFiltro = document.getElementById('dashContaFiltro').value;
-  let escopoContaIds = null;
-  if(contaFiltro) escopoContaIds = [contaFiltro];
-  else if(empresaFiltro) escopoContaIds = contasDaEmpresa(empresaFiltro);
-  const escopoLabel = contaFiltro ? contaNome(contaFiltro) : (empresaFiltro ? empresaNome(empresaFiltro) : 'Todas as contas');
-
-  const noPeriodo = dashModo==='ano' ? l=>l.dataPrevista.slice(0,4)===ano : l=>compOf(l.dataPrevista)===comp;
   const impostoId = catImpostoId();
   const hoje = todayISO();
-  const LIMITE_PAGINA = 480; // altura útil em pt, paisagem A4
+  const noPeriodo = dashModo==='ano' ? l=>l.dataPrevista.slice(0,4)===ano : l=>compOf(l.dataPrevista)===comp;
+  const LIMITE_PAGINA = 700; // altura útil em pt, retrato A4
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'pt', format:'a4', orientation:'landscape'});
+  const doc = new jsPDF({unit:'pt', format:'a4', orientation:'portrait'});
   let y = 40;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(16);
   doc.text('SOFT+ — Relatorio Financeiro', 40, y); y+=20;
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
   const periodoLabel = dashModo==='ano' ? `Ano de ${ano}` : monthLabel(comp);
-  doc.text(`Periodo: ${periodoLabel}   |   Escopo: ${escopoLabel}   |   Gerado em ${fmtDate(hoje)}`, 40, y); y+=20;
+  doc.text(`Periodo: ${periodoLabel}   |   Gerado em ${fmtDate(hoje)}`, 40, y); y+=20;
 
-  // Resumo global no escopo já selecionado na tela
-  let lancEscopo = DB.lancamentos.filter(noPeriodo);
-  if(escopoContaIds) lancEscopo = lancEscopo.filter(l=>escopoContaIds.includes(l.contaId) && lancamentoEntraNoConsolidado(l, escopoContaIds));
-  else lancEscopo = lancEscopo.filter(l=>lancamentoEntraNoConsolidado(l, null));
-  const rGlobal = resumoFinanceiro(lancEscopo, impostoId);
-  doc.autoTable({
-    startY: y,
-    head: [['Entradas recebidas','Saidas pagas','Impostos pagos','Total de despesas','Lucro liquido']],
-    body: [[fmtMoney(rGlobal.entradas), fmtMoney(rGlobal.saidas), fmtMoney(rGlobal.impostos), fmtMoney(rGlobal.despesas), fmtMoney(rGlobal.lucro)]],
-    theme:'grid', styles:{fontSize:9, halign:'right'}, headStyles:{fillColor:[13,79,196]}
+  const empresasComConta = DB.empresas.filter(e=>contasDaEmpresa(e.id).length>0);
+
+  // Lançamentos "no geral" do período, já reunidos de todas as empresas
+  let todosLancamentos = [];
+  empresasComConta.forEach(emp=>{
+    const ids = contasDaEmpresa(emp.id);
+    todosLancamentos = todosLancamentos.concat(
+      DB.lancamentos.filter(noPeriodo).filter(l=>ids.includes(l.contaId) && lancamentoEntraNoConsolidado(l, ids))
+    );
   });
-  y = doc.lastAutoTable.finalY + 24;
 
-  if(escopoContaIds){
-    // Um único escopo já selecionado (uma conta ou uma empresa) — sem necessidade de dividir mais
-    const pendPeriodo = lancEscopo.filter(l=>l.status==='Pendente');
-    let pendAcum = DB.lancamentos.filter(l=>l.status==='Pendente' && escopoContaIds.includes(l.contaId));
-    y = tabelaLancamentos(doc, y, 'Lancamentos do periodo', lancEscopo);
-    y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-    y = tabelaPendencias(doc, y, 'Pendencias do periodo', pendPeriodo, [179,121,15], false, hoje);
-    y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-    y = tabelaPendencias(doc, y, 'Pendencias acumuladas — todo o historico', pendAcum, [199,63,63], true, hoje);
-  }else{
-    // Visão consolidada — divide por empresa
-    const empresasComConta = DB.empresas.filter(e=>contasDaEmpresa(e.id).length>0);
-    empresasComConta.forEach(emp=>{
-      const idsEmp = contasDaEmpresa(emp.id);
-      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-      doc.setFont('helvetica','bold'); doc.setFontSize(13);
-      doc.text(`Empresa: ${emp.nome}`, 40, y); y+=16;
+  // 1) Tabela geral por empresa: receitas, despesas, lucro + total
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('Resumo por empresa', 40, y); y+=6;
+  const linhasResumo = empresasComConta.map(emp=>{
+    const ids = contasDaEmpresa(emp.id);
+    const lanc = todosLancamentos.filter(l=>ids.includes(l.contaId));
+    const r = resumoFinanceiro(lanc, impostoId);
+    return { nome:emp.nome, receitas:r.entradas, despesas:r.despesas, lucro:r.lucro };
+  });
+  const totReceitas = linhasResumo.reduce((s,l)=>s+l.receitas,0);
+  const totDespesas = linhasResumo.reduce((s,l)=>s+l.despesas,0);
+  const totLucro = linhasResumo.reduce((s,l)=>s+l.lucro,0);
+  doc.autoTable({
+    startY:y+6,
+    head:[['Empresa','Receitas','Despesas','Lucro']],
+    body: linhasResumo.length ? linhasResumo.map(l=>[l.nome, fmtMoney(l.receitas), fmtMoney(l.despesas), fmtMoney(l.lucro)]) : [['Nenhuma empresa com conta cadastrada','-','-','-']],
+    foot:[['TOTAL', fmtMoney(totReceitas), fmtMoney(totDespesas), fmtMoney(totLucro)]],
+    theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[13,79,196]},
+    footStyles:{fillColor:[230,238,252], textColor:[15,41,71], fontStyle:'bold'},
+    columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
 
-      let lancEmp = DB.lancamentos.filter(noPeriodo).filter(l=>idsEmp.includes(l.contaId) && lancamentoEntraNoConsolidado(l, idsEmp));
-      const rEmp = resumoFinanceiro(lancEmp, impostoId);
-      doc.autoTable({
-        startY:y,
-        head:[['Entradas','Saidas','Impostos','Despesas totais','Lucro']],
-        body:[[fmtMoney(rEmp.entradas), fmtMoney(rEmp.saidas), fmtMoney(rEmp.impostos), fmtMoney(rEmp.despesas), fmtMoney(rEmp.lucro)]],
-        theme:'grid', styles:{fontSize:9, halign:'right'}, headStyles:{fillColor:[91,149,196]}
-      });
-      y = doc.lastAutoTable.finalY + 14;
+  // 2) Entradas separadas por empresa + total
+  y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+  const entradasList = [...todosLancamentos].filter(l=>l.tipo==='entrada')
+    .sort((a,b)=> empresaDaConta(a.contaId).localeCompare(empresaDaConta(b.contaId)) || a.dataPrevista.localeCompare(b.dataPrevista));
+  const totalEntradas = entradasList.reduce((s,l)=>s+l.valor,0);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(`Entradas do periodo (${entradasList.length})`, 40, y); y+=6;
+  doc.autoTable({
+    startY:y+6,
+    head:[['Empresa','Data','Descricao','Categoria','Status','Valor']],
+    body: entradasList.length ? entradasList.map(l=>[empresaDaConta(l.contaId), fmtDate(l.dataPrevista), l.descricao, catName(l.categoriaId), l.status, fmtMoney(l.valor)]) : [['-','-','Nenhuma entrada no periodo','-','-','-']],
+    foot: entradasList.length ? totalFoot(5, totalEntradas, [22,135,90]) : [],
+    theme:'striped', styles:{fontSize:7.5, cellPadding:2.5, overflow:'linebreak'}, headStyles:{fillColor:[22,135,90]},
+    columnStyles:{0:{cellWidth:75},1:{cellWidth:48},2:{cellWidth:'auto'},3:{cellWidth:85},4:{cellWidth:45},5:{cellWidth:58,halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
 
-      const pendPeriodoEmp = lancEmp.filter(l=>l.status==='Pendente');
-      const pendAcumEmp = DB.lancamentos.filter(l=>l.status==='Pendente' && idsEmp.includes(l.contaId));
+  // 3) Saídas separadas por empresa + total
+  y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+  const saidasList = [...todosLancamentos].filter(l=>l.tipo==='saida')
+    .sort((a,b)=> empresaDaConta(a.contaId).localeCompare(empresaDaConta(b.contaId)) || a.dataPrevista.localeCompare(b.dataPrevista));
+  const totalSaidas = saidasList.reduce((s,l)=>s+l.valor,0);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(`Saidas do periodo (${saidasList.length})`, 40, y); y+=6;
+  doc.autoTable({
+    startY:y+6,
+    head:[['Empresa','Data','Descricao','Categoria','Status','Valor']],
+    body: saidasList.length ? saidasList.map(l=>[empresaDaConta(l.contaId), fmtDate(l.dataPrevista), l.descricao, catName(l.categoriaId), l.status, fmtMoney(l.valor)]) : [['-','-','Nenhuma saida no periodo','-','-','-']],
+    foot: saidasList.length ? totalFoot(5, totalSaidas, [199,63,63]) : [],
+    theme:'striped', styles:{fontSize:7.5, cellPadding:2.5, overflow:'linebreak'}, headStyles:{fillColor:[199,63,63]},
+    columnStyles:{0:{cellWidth:75},1:{cellWidth:48},2:{cellWidth:'auto'},3:{cellWidth:85},4:{cellWidth:45},5:{cellWidth:58,halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
 
-      y = tabelaLancamentos(doc, y, `Lancamentos do periodo — ${emp.nome}`, lancEmp);
-      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-      y = tabelaPendencias(doc, y, `Pendencias do periodo — ${emp.nome}`, pendPeriodoEmp, [179,121,15], false, hoje);
-      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-      y = tabelaPendencias(doc, y, `Pendencias acumuladas — ${emp.nome}`, pendAcumEmp, [199,63,63], true, hoje);
-      y += 14;
-    });
+  // 4) Pendências do período, todas as empresas + total a receber / a pagar
+  y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+  const pendPeriodo = [...todosLancamentos].filter(l=>l.status==='Pendente')
+    .sort((a,b)=> empresaDaConta(a.contaId).localeCompare(empresaDaConta(b.contaId)) || a.dataPrevista.localeCompare(b.dataPrevista));
+  const totRecPeriodo = pendPeriodo.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
+  const totPagPeriodo = pendPeriodo.filter(l=>l.tipo==='saida').reduce((s,l)=>s+l.valor,0);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(`Pendencias do periodo (${pendPeriodo.length})`, 40, y); y+=6;
+  doc.autoTable({
+    startY:y+6,
+    head:[['Empresa','Data','Descricao','Tipo','Categoria','Valor']],
+    body: pendPeriodo.length ? pendPeriodo.map(l=>[empresaDaConta(l.contaId), fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), fmtMoney(l.valor)]) : [['-','-','Nenhuma pendencia no periodo','-','-','-']],
+    foot: pendPeriodo.length ? [
+      [{content:'Total a receber:', colSpan:5, styles:{halign:'right', fontStyle:'bold'}}, {content:fmtMoney(totRecPeriodo), styles:{halign:'right', fontStyle:'bold', textColor:[22,135,90]}}],
+      [{content:'Total a pagar:', colSpan:5, styles:{halign:'right', fontStyle:'bold'}}, {content:fmtMoney(totPagPeriodo), styles:{halign:'right', fontStyle:'bold', textColor:[199,63,63]}}]
+    ] : [],
+    theme:'striped', styles:{fontSize:7.5, cellPadding:2.5, overflow:'linebreak'}, headStyles:{fillColor:[179,121,15]},
+    columnStyles:{0:{cellWidth:70},1:{cellWidth:48},2:{cellWidth:'auto'},3:{cellWidth:42},4:{cellWidth:80},5:{cellWidth:58,halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
 
-    const idsSemEmpresa = DB.contas.filter(c=>!c.empresaId).map(c=>c.id);
-    if(idsSemEmpresa.length){
-      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-      doc.setFont('helvetica','bold'); doc.setFontSize(13);
-      doc.text('Contas sem empresa vinculada', 40, y); y+=16;
-      let lancSemEmp = DB.lancamentos.filter(noPeriodo).filter(l=>idsSemEmpresa.includes(l.contaId) && lancamentoEntraNoConsolidado(l, idsSemEmpresa));
-      y = tabelaLancamentos(doc, y, 'Lancamentos do periodo', lancSemEmp);
-      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-      const pendPeriodoSemEmp = lancSemEmp.filter(l=>l.status==='Pendente');
-      const pendAcumSemEmp = DB.lancamentos.filter(l=>l.status==='Pendente' && idsSemEmpresa.includes(l.contaId));
-      y = tabelaPendencias(doc, y, 'Pendencias do periodo', pendPeriodoSemEmp, [179,121,15], false, hoje);
-      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-      y = tabelaPendencias(doc, y, 'Pendencias acumuladas', pendAcumSemEmp, [199,63,63], true, hoje);
-    }
-  }
+  // 5) Pendências totais (todo o histórico), todas as empresas + total a receber / a pagar
+  y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+  let pendTotais = [];
+  empresasComConta.forEach(emp=>{
+    const ids = contasDaEmpresa(emp.id);
+    pendTotais = pendTotais.concat(DB.lancamentos.filter(l=>l.status==='Pendente' && ids.includes(l.contaId)));
+  });
+  pendTotais.sort((a,b)=> empresaDaConta(a.contaId).localeCompare(empresaDaConta(b.contaId)) || a.dataPrevista.localeCompare(b.dataPrevista));
+  const totRecAcum = pendTotais.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
+  const totPagAcum = pendTotais.filter(l=>l.tipo==='saida').reduce((s,l)=>s+l.valor,0);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(`Pendencias totais — todo o historico (${pendTotais.length})`, 40, y); y+=6;
+  doc.autoTable({
+    startY:y+6,
+    head:[['Empresa','Data','Descricao','Tipo','Categoria','Situacao','Valor']],
+    body: pendTotais.length ? pendTotais.map(l=>[empresaDaConta(l.contaId), fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), (l.dataPrevista<hoje?'Atrasado':'No prazo'), fmtMoney(l.valor)]) : [['-','-','Nenhuma pendencia acumulada','-','-','-','-']],
+    foot: pendTotais.length ? [
+      [{content:'Total a receber:', colSpan:6, styles:{halign:'right', fontStyle:'bold'}}, {content:fmtMoney(totRecAcum), styles:{halign:'right', fontStyle:'bold', textColor:[22,135,90]}}],
+      [{content:'Total a pagar:', colSpan:6, styles:{halign:'right', fontStyle:'bold'}}, {content:fmtMoney(totPagAcum), styles:{halign:'right', fontStyle:'bold', textColor:[199,63,63]}}]
+    ] : [],
+    theme:'striped', styles:{fontSize:7, cellPadding:2.5, overflow:'linebreak'}, headStyles:{fillColor:[199,63,63]},
+    columnStyles:{0:{cellWidth:62},1:{cellWidth:44},2:{cellWidth:'auto'},3:{cellWidth:38},4:{cellWidth:65},5:{cellWidth:42},6:{cellWidth:52,halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
 
-  // Divisão entre sócios — sempre tenta mostrar, com mensagem clara se não houver dados
+  // 6) Divisão entre sócios — sempre tenta mostrar, com mensagem clara se não houver dados
   if(isAdmin()){
     y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
-    doc.setFont('helvetica','bold'); doc.setFontSize(13);
-    doc.text('Divisao entre socios (lucro global, contas "no geral")', 40, y); y+=16;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text('Divisao entre socios (lucro global, contas "no geral")', 40, y); y+=6;
 
     if(DB.socios.length===0){
       doc.setFont('helvetica','normal'); doc.setFontSize(9);
-      doc.text('Nenhum socio cadastrado (Menu > Socios).', 40, y); y+=16;
+      doc.text('Nenhum socio cadastrado (Menu > Socios).', 40, y+10); y+=20;
     }else{
       const linhas = calcularLinhasSocios(comp, ano, dashModo);
-
       doc.autoTable({
-        startY:y,
+        startY:y+6,
         head:[['Socio','%','Direito','Retirado','Diferenca']],
         body: linhas.map(l=>[l.socio.nome, `${(l.socio.percentual||0).toFixed(2)}%`, fmtMoney(l.direito), fmtMoney(l.totalRetirado), fmtMoney(l.diferenca)]),
         theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[13,79,196]}, columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}
       });
-      y = doc.lastAutoTable.finalY + 16;
+      y = doc.lastAutoTable.finalY + 14;
 
       const repasses = calcularRepasses(linhas);
+      doc.setFont('helvetica','bold'); doc.setFontSize(10);
+      doc.text('Quanto cada um deve repassar para igualar as retiradas:', 40, y); y+=16;
       doc.setFont('helvetica','normal'); doc.setFontSize(9);
       if(repasses.length===0){
         doc.text('Sem diferencas a acertar entre os socios neste periodo.', 40, y); y+=14;
@@ -1881,10 +1896,28 @@ function exportarRelatorioPDF(){
         repasses.forEach(r=>{ doc.text(`- ${r.de} deve repassar ${fmtMoney(r.valor)} para ${r.para}`, 40, y); y+=14; });
       }
     }
+    y += 8;
   }
 
-  const sufixoEscopo = escopoLabel!=='Todas as contas' ? '_'+escopoLabel.replace(/[^a-zA-Z0-9]/g,'_') : '';
-  doc.save(`relatorio_softplus_${dashModo==='ano'?ano:comp}${sufixoEscopo}.pdf`);
+  // 7) Saldo por conta e totais
+  y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text('Saldo por conta', 40, y); y+=6;
+  const linhasSaldo = [...DB.contas]
+    .map(c=>({ empresa: c.empresaId ? empresaNome(c.empresaId) : 'Sem empresa', conta:c.nome, saldo:saldoDeContas([c.id]) }))
+    .sort((a,b)=> a.empresa.localeCompare(b.empresa) || a.conta.localeCompare(b.conta));
+  const totalSaldoGeral = linhasSaldo.reduce((s,l)=>s+l.saldo,0);
+  doc.autoTable({
+    startY:y+6,
+    head:[['Empresa','Conta','Saldo']],
+    body: linhasSaldo.length ? linhasSaldo.map(l=>[l.empresa, l.conta, fmtMoney(l.saldo)]) : [['-','Nenhuma conta cadastrada','-']],
+    foot: linhasSaldo.length ? [[{content:'TOTAL', colSpan:2, styles:{halign:'right', fontStyle:'bold'}}, {content:fmtMoney(totalSaldoGeral), styles:{halign:'right', fontStyle:'bold'}}]] : [],
+    theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[13,79,196]},
+    footStyles:{fillColor:[230,238,252], textColor:[15,41,71], fontStyle:'bold'},
+    columnStyles:{2:{halign:'right'}}
+  });
+
+  doc.save(`relatorio_softplus_${dashModo==='ano'?ano:comp}.pdf`);
   toast('PDF gerado');
 }
 
@@ -2853,7 +2886,10 @@ function salvarRetirada(){
   if(!contaNomeRaw){ toast('Selecione a conta de origem'); return; }
   const contaId = findContaId(contaNomeRaw);
   if(contaId===undefined){ toast('Conta não encontrada — selecione uma da lista'); return; }
+  if(!contaEntraNoGeral(contaId)){ toast('Só é possível registrar retirada de sócio a partir de contas marcadas "no geral". Escolha outra conta.'); return; }
   if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
+  const saldoAtual = saldoDeContas([contaId]);
+  if(valor > saldoAtual){ toast(`Saldo insuficiente nessa conta (${fmtMoney(saldoAtual)}). A retirada deixaria a conta negativa.`); return; }
   if(!data){ toast('Informe a data'); return; }
   const cat = getRetiradaCategoria();
   if(!cat){ toast('Preparando categoria de retirada, tente novamente em instantes'); return; }
