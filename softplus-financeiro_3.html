@@ -241,7 +241,7 @@
       </div>
     </div>
 
-    <div class="grid grid-4" id="dashCards"></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit, minmax(150px,1fr));" id="dashCards"></div>
 
     <div class="grid grid-3" style="margin-top:12px;" id="dashCards2"></div>
 
@@ -424,7 +424,7 @@
     </div>
     <div class="card table-scroll" style="padding:0;">
       <table id="contasTable">
-        <thead><tr><th>Nome</th><th>Observações</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Observações</th><th>Fluxo geral</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -484,6 +484,8 @@
     <input type="hidden" id="contaId">
     <div class="field"><label>Nome da conta <span class="required-mark">*</span></label><input type="text" id="contaNome" placeholder="Ex: Caixa principal, Conta reserva, Sócio A..." required></div>
     <div class="field"><label>Observações</label><input type="text" id="contaObs"></div>
+    <div class="checkbox-row"><input type="checkbox" id="contaConsiderarGeral" checked> <label for="contaConsiderarGeral">Considerar esta conta no cálculo geral de fluxo de caixa (Painel/Relatórios em "Todas as contas")</label></div>
+    <p style="font-size:11px; color:var(--text-faint); margin-top:6px;">Desmarque para contas que só guardam recurso já contabilizado em outro lugar (ex: reserva interna) — assim ela não duplica o resultado geral. A conta continua aparecendo normalmente quando filtrada individualmente.</p>
     <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('overlayConta')">Cancelar</button>
@@ -840,6 +842,11 @@ function catImpostoId(){ const c=DB.categorias.find(x=>x.nome==='Imposto'); retu
 function clienteNome(id){ const c=DB.clientes.find(x=>x.id===id); return c?c.nome:'—'; }
 function contratoLabel(id){ const c=DB.contratos.find(x=>x.id===id); if(!c) return '—'; return `${clienteNome(c.clienteId)} — ${c.objeto}`; }
 function contaNome(id){ const c=DB.contas.find(x=>x.id===id); return c?c.nome:'—'; }
+function contaEntraNoGeral(contaId){
+  if(!contaId) return true;
+  const c = DB.contas.find(x=>x.id===contaId);
+  return c ? (c.considerarGeral !== false) : true;
+}
 
 /* ---------- CSV ENGINE (Exportar / Importar / Modelo) ---------- */
 function csvEscape(v){
@@ -1305,18 +1312,19 @@ function renderDashboard(){
 
   let lancComp = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp);
   if(contaFiltro) lancComp = lancComp.filter(l=>l.contaId===contaFiltro);
-  else lancComp = lancComp.filter(l=>!l.transferencia);
+  else lancComp = lancComp.filter(l=>!l.transferencia && contaEntraNoGeral(l.contaId));
   const impostoId = catImpostoId();
 
   const entradasPagas = lancComp.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
   const saidasPagas = lancComp.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
   const impostosPagos = lancComp.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
-  const lucro = entradasPagas - saidasPagas - impostosPagos;
+  const despesasTotais = saidasPagas + impostosPagos;
+  const lucro = entradasPagas - despesasTotais;
 
   const pendentes = lancComp.filter(l=>l.status==='Pendente');
   const pendentesValor = pendentes.reduce((s,l)=>s+l.valor,0);
 
-  const contratosAtivosFiltrados = DB.contratos.filter(c=>c.status==='Ativo' && (!contaFiltro || c.contaId===contaFiltro));
+  const contratosAtivosFiltrados = DB.contratos.filter(c=>c.status==='Ativo' && (contaFiltro ? c.contaId===contaFiltro : contaEntraNoGeral(c.contaId)));
   const mrr = contratosAtivosFiltrados.reduce((s,c)=>s+(c.valorMensal||0),0);
 
   const hoje = todayISO();
@@ -1330,6 +1338,7 @@ function renderDashboard(){
       <div class="card"><div class="metric-label">Entradas recebidas</div><div class="metric-value pos num">${fmtMoney(entradasPagas)}</div></div>
       <div class="card"><div class="metric-label">Saídas pagas</div><div class="metric-value neg num">${fmtMoney(saidasPagas)}</div></div>
       <div class="card"><div class="metric-label">Impostos pagos</div><div class="metric-value neg num">${fmtMoney(impostosPagos)}</div></div>
+      <div class="card"><div class="metric-label">Total de despesas (saídas + impostos)</div><div class="metric-value neg num">${fmtMoney(despesasTotais)}</div></div>
       <div class="card"><div class="metric-label">Lucro líquido</div><div class="metric-value ${lucro>=0?'pos':'neg'} num">${fmtMoney(lucro)}</div></div>
     `;
   }else{
@@ -2028,7 +2037,7 @@ function resumoMes(comp, contaId){
   const impostoId = catImpostoId();
   let list = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago');
   if(contaId) list = list.filter(l=>l.contaId===contaId);
-  else list = list.filter(l=>!l.transferencia);
+  else list = list.filter(l=>!l.transferencia && contaEntraNoGeral(l.contaId));
   const entradas = list.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
   const impostos = list.filter(l=>l.tipo==='saida' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
   const saidas = list.filter(l=>l.tipo==='saida' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
@@ -2066,7 +2075,7 @@ function renderRelatorios(){
 
   const comp = currentComp();
   const porCliente = {};
-  DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago' && l.tipo==='entrada' && l.contratoId && (!contaFiltro || l.contaId===contaFiltro)).forEach(l=>{
+  DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago' && l.tipo==='entrada' && l.contratoId && (contaFiltro ? l.contaId===contaFiltro : contaEntraNoGeral(l.contaId))).forEach(l=>{
     const contrato = DB.contratos.find(c=>c.id===l.contratoId);
     if(!contrato) return;
     const cli = clienteNome(contrato.clienteId);
@@ -2088,20 +2097,24 @@ function renderContas(){
   const tbody = document.querySelector('#contasTable tbody');
   if(!tbody) return;
   if(DB.contas.length===0){
-    tbody.innerHTML = `<tr><td colspan="3" class="empty"><b>Nenhuma conta cadastrada</b>Crie contas para dividir os lançamentos (não precisa ser bancária).</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="empty"><b>Nenhuma conta cadastrada</b>Crie contas para dividir os lançamentos (não precisa ser bancária).</td></tr>`;
     document.getElementById('pagContas').innerHTML = '';
     return;
   }
   const { pageItems, totalPages, currentPage, total } = paginate(DB.contas, 'contas');
   renderPagination('pagContas', 'contas', totalPages, currentPage, total);
-  tbody.innerHTML = pageItems.map(c=>`<tr>
+  tbody.innerHTML = pageItems.map(c=>{
+    const entraGeral = c.considerarGeral !== false;
+    return `<tr>
       <td>${c.nome}</td>
       <td style="color:var(--text-dim);">${c.obs||'—'}</td>
+      <td><span class="badge ${entraGeral?'badge-green':'badge-gray'}">${entraGeral?'No geral':'Fora do geral'}</span></td>
       <td class="row-actions">
         <button class="icon-btn" title="Editar" onclick="editarConta('${c.id}')">✎</button>
         <button class="icon-btn" title="Excluir" onclick="excluirConta('${c.id}')">✕</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 document.getElementById('btnNovaConta').onclick = ()=>{
   if(!isAdmin()) return;
@@ -2109,6 +2122,7 @@ document.getElementById('btnNovaConta').onclick = ()=>{
   document.getElementById('contaId').value='';
   document.getElementById('contaNome').value='';
   document.getElementById('contaObs').value='';
+  document.getElementById('contaConsiderarGeral').checked=true;
   openModal('overlayConta');
 };
 function editarConta(id){
@@ -2118,6 +2132,7 @@ function editarConta(id){
   document.getElementById('contaId').value=c.id;
   document.getElementById('contaNome').value=c.nome;
   document.getElementById('contaObs').value=c.obs||'';
+  document.getElementById('contaConsiderarGeral').checked = c.considerarGeral !== false;
   openModal('overlayConta');
 }
 function salvarConta(){
@@ -2125,7 +2140,7 @@ function salvarConta(){
   const nome = document.getElementById('contaNome').value.trim();
   if(!nome){ toast('Informe o nome da conta'); return; }
   const id = document.getElementById('contaId').value;
-  const data = { nome, obs:document.getElementById('contaObs').value };
+  const data = { nome, obs:document.getElementById('contaObs').value, considerarGeral:document.getElementById('contaConsiderarGeral').checked };
   let rec;
   if(id){ rec = DB.contas.find(c=>c.id===id); Object.assign(rec, data); }
   else{ rec = {id:uid(), ...data}; DB.contas.push(rec); }
