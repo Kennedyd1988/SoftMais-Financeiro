@@ -213,6 +213,7 @@
   <button class="nav-btn" data-view="modelos"><span class="nav-dot"></span>Modelos recorrentes</button>
   <button class="nav-btn" data-view="relatorios"><span class="nav-dot"></span>Relatórios</button>
   <button class="nav-btn" data-view="empresas" id="navEmpresas" style="display:none;"><span class="nav-dot"></span>Empresas</button>
+  <button class="nav-btn" data-view="socios" id="navSocios" style="display:none;"><span class="nav-dot"></span>Sócios</button>
   <button class="nav-btn" data-view="contas" id="navContas" style="display:none;"><span class="nav-dot"></span>Contas</button>
   <button class="nav-btn" data-view="usuarios" id="navUsuarios" style="display:none;"><span class="nav-dot"></span>Usuários</button>
 
@@ -244,6 +245,7 @@
           <span id="dashMonthLabel">—</span>
           <button id="dashNext">›</button>
         </div>
+        <button class="btn btn-primary btn-sm" id="btnExportarPDF">📄 Exportar PDF</button>
       </div>
     </div>
 
@@ -264,6 +266,17 @@
         <table id="dashContratosVencerTable"><thead><tr><th>Cliente</th><th>Objeto</th><th>Fim da vigência</th><th id="colMensalidadeVencer" style="text-align:right">Mensalidade</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
+
+    <section class="block" id="blockSocios" style="display:none;">
+      <div class="block-title">Divisão entre sócios (lucro global, contas "no geral")</div>
+      <div class="card table-scroll" style="padding:0;">
+        <table id="sociosResumoTable">
+          <thead><tr><th>Sócio</th><th style="text-align:right">%</th><th style="text-align:right">Direito</th><th style="text-align:right">Retirado (lançamentos)</th><th style="text-align:right">Ajuste manual</th><th style="text-align:right">Diferença</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="sociosRepasses" style="margin-top:10px;"></div>
+    </section>
   </section>
 
   <!-- LANÇAMENTOS -->
@@ -277,6 +290,7 @@
         <select id="gerarTipoSel" title="O que gerar"></select>
         <button class="btn" id="btnGerarMes" title="Gera para o mês e ano selecionados nos filtros abaixo"><i>&#8635;</i> Gerar lançamentos do mês</button>
         <button class="btn" id="btnTransferencia">↔ Transferir entre contas</button>
+        <button class="btn" id="btnRetirada" style="display:none;">💰 Retirada de sócio</button>
         <button class="btn btn-primary" id="btnNovoLancamento">+ Lançamento manual</button>
       </div>
     </div>
@@ -438,6 +452,25 @@
     <div id="pagEmpresas"></div>
   </section>
 
+    <!-- SOCIOS -->
+  <section class="view" id="view-socios">
+    <div class="view-header">
+      <div>
+        <div class="view-title">Sócios</div>
+        <div class="view-desc">Percentual de cada sócio sobre o lucro das contas marcadas "no geral"</div>
+      </div>
+      <button class="btn btn-primary" id="btnNovoSocio">+ Novo sócio</button>
+    </div>
+    <p id="socioSomaAviso" style="font-size:12.5px; color:var(--amber); margin-bottom:10px; display:none;"></p>
+    <div class="card table-scroll" style="padding:0;">
+      <table id="sociosTable">
+        <thead><tr><th>Nome</th><th style="text-align:right">Percentual</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="pagSocios"></div>
+  </section>
+
   <!-- CONTAS -->
   <section class="view" id="view-contas">
     <div class="view-header">
@@ -484,6 +517,45 @@
   </section>
 
 </main>
+
+<!-- MODAL SOCIO -->
+<div class="overlay" id="overlaySocio">
+  <div class="modal">
+    <h3 id="modalSocioTitle">Novo sócio</h3>
+    <input type="hidden" id="socioId">
+    <div class="field"><label>Nome <span class="required-mark">*</span></label><input type="text" id="socioNome" required></div>
+    <div class="field"><label>Percentual sobre o lucro (%) <span class="required-mark">*</span></label><input type="number" step="0.01" min="0" max="100" id="socioPercentual" required></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios — a soma dos percentuais de todos os sócios deve fechar em 100%</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('overlaySocio')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarSocio()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RETIRADA DE SOCIO -->
+<div class="overlay" id="overlayRetirada">
+  <div class="modal">
+    <h3>Registrar retirada de sócio</h3>
+    <div class="field"><label>Sócio <span class="required-mark">*</span></label>
+      <input type="text" id="retiradaSocio" list="dlSocios" placeholder="Digite para buscar..." autocomplete="off" required>
+      <datalist id="dlSocios"></datalist>
+    </div>
+    <div class="field"><label>Conta de origem (será debitada) <span class="required-mark">*</span></label>
+      <input type="text" id="retiradaConta" list="dlContas" placeholder="Digite para buscar..." autocomplete="off" required>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="retiradaValor" required></div>
+      <div class="field"><label>Data <span class="required-mark">*</span></label><input type="date" id="retiradaData" required></div>
+    </div>
+    <div class="field"><label>Observação (opcional)</label><input type="text" id="retiradaObs"></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios — não entra como despesa da empresa, é distribuição de lucro já apurado</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('overlayRetirada')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarRetirada()">Registrar retirada</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL TRANSFERENCIA -->
 <div class="overlay" id="overlayTransferencia">
@@ -709,7 +781,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[], contas:[], empresas:[] };
+let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[], contas:[], empresas:[], socios:[], ajustesSocios:[] };
 let dashDate = new Date();
 let currentUser = null;
 
@@ -766,7 +838,7 @@ function toast(msg){
 
 /* ---------- PAGINAÇÃO ---------- */
 const PAGE_SIZE = 25;
-const pageState = { lancamentos:1, contratos:1, clientes:1, modelos:1, contas:1, usuarios:1, empresas:1 };
+const pageState = { lancamentos:1, contratos:1, clientes:1, modelos:1, contas:1, usuarios:1, empresas:1, socios:1 };
 function paginate(list, key){
   const total = list.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -793,7 +865,7 @@ function changePage(key, delta){
   renderAll();
 }
 
-const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios','contas','empresas'];
+const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios','contas','empresas','socios','ajustesSocios'];
 const loadedTables = new Set();
 
 function seedCategoriasIfNeeded(){
@@ -813,6 +885,7 @@ function seedCategoriasIfNeeded(){
 }
 
 const TRANSFER_CATEGORIA_NOME = 'Transferência entre contas';
+const RETIRADA_CATEGORIA_NOME = 'Retirada de sócio';
 function ensureTransferCategorias(){
   if(window._transferCatChecked) return;
   window._transferCatChecked = true;
@@ -822,6 +895,9 @@ function ensureTransferCategorias(){
   }
   if(!DB.categorias.some(c=>c.nome===TRANSFER_CATEGORIA_NOME && c.tipo==='saida')){
     faltantes.push({id:uid(), nome:TRANSFER_CATEGORIA_NOME, tipo:'saida'});
+  }
+  if(!DB.categorias.some(c=>c.nome===RETIRADA_CATEGORIA_NOME && c.tipo==='saida')){
+    faltantes.push({id:uid(), nome:RETIRADA_CATEGORIA_NOME, tipo:'saida'});
   }
   if(faltantes.length){
     faltantes.forEach(c=>DB.categorias.push(c));
@@ -833,6 +909,9 @@ function getTransferCategorias(){
     catEntrada: DB.categorias.find(c=>c.nome===TRANSFER_CATEGORIA_NOME && c.tipo==='entrada'),
     catSaida: DB.categorias.find(c=>c.nome===TRANSFER_CATEGORIA_NOME && c.tipo==='saida')
   };
+}
+function getRetiradaCategoria(){
+  return DB.categorias.find(c=>c.nome===RETIRADA_CATEGORIA_NOME && c.tipo==='saida');
 }
 
 async function migrateTableIfNeeded(key){
@@ -905,6 +984,7 @@ function contaEntraNoGeral(contaId){
  *                 array = visão restrita a uma empresa ou a uma conta específica.
  */
 function lancamentoEntraNoConsolidado(l, escopoContaIds){
+  if(l.retirada) return false; // retirada de sócio nunca é despesa da empresa — é distribuição de lucro já apurado
   if(!l.transferencia){
     if(escopoContaIds) return escopoContaIds.includes(l.contaId);
     return contaEntraNoGeral(l.contaId);
@@ -1238,6 +1318,7 @@ function viewIsAllowed(view){
     case 'usuarios': return isAdmin();
     case 'contas': return isAdmin();
     case 'empresas': return isAdmin();
+    case 'socios': return isAdmin();
     default: return false;
   }
 }
@@ -1301,6 +1382,7 @@ function renderAll(){
   renderUsuarios();
   renderContas();
   renderEmpresas();
+  renderSocios();
   fillSelects();
 }
 
@@ -1329,6 +1411,7 @@ function fillSelects(){
   fillDatalist('dlContas', sortByLabel(DB.contas, c=>c.nome).map(c=>c.nome));
   fillDatalist('dlContratos', sortByLabel(DB.contratos, c=>contratoLabel(c.id)).map(c=>contratoLabel(c.id)));
   fillDatalist('dlEmpresas', sortByLabel(DB.empresas, e=>e.nome).map(e=>e.nome));
+  fillDatalist('dlSocios', sortByLabel(DB.socios, s=>s.nome).map(s=>s.nome));
   refreshCategoriaDatalist('dlCategoriasModelo', document.getElementById('modeloTipo').value);
   refreshCategoriaDatalist('dlCategoriasLanc', document.getElementById('lancTipo').value);
 
@@ -1545,6 +1628,225 @@ function renderDashboard(){
       <td>${clienteNome(c.clienteId)}</td><td>${c.objeto}</td><td>${fmtDate(c.dataFim)}</td>${modoGeral?`<td class="cell-num">${fmtMoney(c.valorMensal)}</td>`:''}
     </tr>`).join('');
   }
+
+  renderDivisaoSocios(comp, ano);
+}
+
+function renderDivisaoSocios(comp, ano){
+  const bloco = document.getElementById('blockSocios');
+  if(!isAdmin() || DB.socios.length===0){ bloco.style.display='none'; return; }
+  bloco.style.display = '';
+
+  // Lucro GLOBAL (sem filtro de conta/empresa), das contas marcadas "no geral", no período selecionado no Painel
+  const noPeriodo = dashModo==='ano' ? l=>l.dataPrevista.slice(0,4)===ano : l=>compOf(l.dataPrevista)===comp;
+  const lancGlobal = DB.lancamentos.filter(noPeriodo).filter(l=>lancamentoEntraNoConsolidado(l, null));
+  const impostoId = catImpostoId();
+  const entradasG = lancGlobal.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
+  const saidasG = lancGlobal.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
+  const impostosG = lancGlobal.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
+  const lucroGlobal = entradasG - saidasG - impostosG;
+
+  // Retiradas já registradas (lançamentos de retirada) no mesmo período, por sócio
+  const retiradasPeriodo = DB.lancamentos.filter(l=>l.retirada && noPeriodo(l) && l.status==='Pago');
+
+  const competencia = dashModo==='ano' ? ano : comp; // chave usada para o ajuste manual
+
+  const linhas = DB.socios.map(s=>{
+    const direito = lucroGlobal * ((s.percentual||0)/100);
+    const retiradoLanc = retiradasPeriodo.filter(l=>l.socioId===s.id).reduce((sum,l)=>sum+l.valor,0);
+    const ajuste = DB.ajustesSocios.find(a=>a.socioId===s.id && a.competencia===competencia);
+    const ajusteValor = ajuste ? ajuste.valor : 0;
+    const totalRetirado = retiradoLanc + ajusteValor;
+    const diferenca = direito - totalRetirado;
+    return { socio:s, direito, retiradoLanc, ajusteValor, totalRetirado, diferenca };
+  });
+
+  const tbody = document.querySelector('#sociosResumoTable tbody');
+  tbody.innerHTML = linhas.map(l=>`<tr>
+      <td>${l.socio.nome}</td>
+      <td class="cell-num">${(l.socio.percentual||0).toFixed(2)}%</td>
+      <td class="cell-num">${fmtMoney(l.direito)}</td>
+      <td class="cell-num">${fmtMoney(l.retiradoLanc)}</td>
+      <td class="cell-num"><input type="number" step="0.01" value="${l.ajusteValor||''}" placeholder="0,00" style="width:100px; text-align:right;" onchange="salvarAjusteSocio('${l.socio.id}','${competencia}', this.value)"></td>
+      <td class="cell-num" style="color:${l.diferenca>=0?'var(--green)':'var(--red)'}">${fmtMoney(l.diferenca)}</td>
+    </tr>`).join('');
+
+  // Sugestão de repasses entre sócios para equilibrar
+  const credores = linhas.filter(l=>l.diferenca>0.01).map(l=>({nome:l.socio.nome, valor:l.diferenca})).sort((a,b)=>b.valor-a.valor);
+  const devedores = linhas.filter(l=>l.diferenca<-0.01).map(l=>({nome:l.socio.nome, valor:-l.diferenca})).sort((a,b)=>b.valor-a.valor);
+  const repasses = [];
+  let i=0, j=0;
+  while(i<devedores.length && j<credores.length){
+    const dev = devedores[i], cred = credores[j];
+    const valor = Math.min(dev.valor, cred.valor);
+    repasses.push({de:dev.nome, para:cred.nome, valor});
+    dev.valor -= valor; cred.valor -= valor;
+    if(dev.valor<0.01) i++;
+    if(cred.valor<0.01) j++;
+  }
+  const repassesEl = document.getElementById('sociosRepasses');
+  if(repasses.length===0){
+    repassesEl.innerHTML = `<p style="font-size:12.5px; color:var(--text-dim);">Sem diferenças a acertar entre os sócios neste período.</p>`;
+  }else{
+    repassesEl.innerHTML = `<p style="font-size:12.5px; color:var(--text-dim); margin-bottom:6px;">Para equilibrar as retiradas com o percentual de cada um:</p>` +
+      repasses.map(r=>`<div class="card" style="padding:10px 14px; margin-bottom:6px;"><b>${r.de}</b> deve repassar <b>${fmtMoney(r.valor)}</b> para <b>${r.para}</b></div>`).join('');
+  }
+}
+function salvarAjusteSocio(socioId, competencia, valorStr){
+  if(!isAdmin()) return;
+  const valor = parseFloat(valorStr) || 0;
+  let rec = DB.ajustesSocios.find(a=>a.socioId===socioId && a.competencia===competencia);
+  if(rec){ rec.valor = valor; }
+  else{ rec = {id:uid(), socioId, competencia, valor}; DB.ajustesSocios.push(rec); }
+  saveRecord('ajustesSocios', rec).then(()=>{ renderDashboard(); });
+}
+
+/* ---------- EXPORTAR RELATÓRIO PDF ---------- */
+document.getElementById('btnExportarPDF').onclick = ()=>{
+  if(typeof window.jspdf === 'undefined'){ toast('Biblioteca de PDF ainda carregando — tente de novo em alguns segundos'); return; }
+  try{ exportarRelatorioPDF(); }
+  catch(e){ console.error('Erro ao gerar PDF', e); toast('Erro ao gerar o PDF'); }
+};
+
+function exportarRelatorioPDF(){
+  const comp = currentComp();
+  const ano = comp.slice(0,4);
+  const empresaFiltro = document.getElementById('dashEmpresaFiltro').value;
+  const contaFiltro = document.getElementById('dashContaFiltro').value;
+  let escopoContaIds = null;
+  if(contaFiltro) escopoContaIds = [contaFiltro];
+  else if(empresaFiltro) escopoContaIds = contasDaEmpresa(empresaFiltro);
+  const escopoLabel = contaFiltro ? contaNome(contaFiltro) : (empresaFiltro ? empresaNome(empresaFiltro) : 'Todas as contas');
+
+  const noPeriodo = dashModo==='ano' ? l=>l.dataPrevista.slice(0,4)===ano : l=>compOf(l.dataPrevista)===comp;
+  let lancPeriodo = DB.lancamentos.filter(noPeriodo);
+  if(escopoContaIds) lancPeriodo = lancPeriodo.filter(l=>escopoContaIds.includes(l.contaId) && lancamentoEntraNoConsolidado(l, escopoContaIds));
+  else lancPeriodo = lancPeriodo.filter(l=>lancamentoEntraNoConsolidado(l, null));
+
+  const impostoId = catImpostoId();
+  const entradasPagas = lancPeriodo.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
+  const saidasPagas = lancPeriodo.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
+  const impostosPagos = lancPeriodo.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
+  const despesasTotais = saidasPagas + impostosPagos;
+  const lucro = entradasPagas - despesasTotais;
+
+  const pendPeriodo = lancPeriodo.filter(l=>l.status==='Pendente');
+
+  let pendAcumuladas = DB.lancamentos.filter(l=>l.status==='Pendente');
+  if(escopoContaIds) pendAcumuladas = pendAcumuladas.filter(l=>escopoContaIds.includes(l.contaId));
+  else pendAcumuladas = pendAcumuladas.filter(l=>contaEntraNoGeral(l.contaId));
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+  let y = 40;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('SOFT+ — Relatorio Financeiro', 40, y); y+=20;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  const periodoLabel = dashModo==='ano' ? `Ano de ${ano}` : monthLabel(comp);
+  doc.text(`Periodo: ${periodoLabel}`, 40, y); y+=14;
+  doc.text(`Escopo: ${escopoLabel}`, 40, y); y+=14;
+  doc.text(`Gerado em ${fmtDate(todayISO())}`, 40, y); y+=20;
+
+  doc.autoTable({
+    startY: y,
+    head: [['Entradas recebidas','Saidas pagas','Impostos pagos','Total de despesas','Lucro liquido']],
+    body: [[fmtMoney(entradasPagas), fmtMoney(saidasPagas), fmtMoney(impostosPagos), fmtMoney(despesasTotais), fmtMoney(lucro)]],
+    theme:'grid', styles:{fontSize:9, halign:'right'}, headStyles:{fillColor:[13,79,196]}
+  });
+  y = doc.lastAutoTable.finalY + 22;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(`Lancamentos do periodo (${lancPeriodo.length})`, 40, y);
+  doc.autoTable({
+    startY: y+8,
+    head:[['Data','Descricao','Tipo','Categoria','Conta','Status','Valor']],
+    body: lancPeriodo.length ? [...lancPeriodo].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
+      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), l.contaId?contaNome(l.contaId):'-', l.status, fmtMoney(l.valor)
+    ]) : [['-','Nenhum lancamento no periodo','','','','','']],
+    theme:'striped', styles:{fontSize:8}, headStyles:{fillColor:[13,79,196]}, columnStyles:{6:{halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
+
+  if(y > 680){ doc.addPage(); y = 40; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(`Pendencias do periodo (${pendPeriodo.length})`, 40, y);
+  doc.autoTable({
+    startY:y+8,
+    head:[['Vencimento','Descricao','Tipo','Categoria','Valor']],
+    body: pendPeriodo.length ? [...pendPeriodo].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
+      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), fmtMoney(l.valor)
+    ]) : [['-','Nenhuma pendencia no periodo','','','']],
+    theme:'striped', styles:{fontSize:8}, headStyles:{fillColor:[179,121,15]}, columnStyles:{4:{halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
+
+  if(y > 650){ doc.addPage(); y = 40; }
+  doc.setFont('helvetica','bold'); doc.setFontSize(12);
+  doc.text(`Pendencias acumuladas — todo o historico (${pendAcumuladas.length})`, 40, y);
+  const hoje = todayISO();
+  doc.autoTable({
+    startY:y+8,
+    head:[['Vencimento','Descricao','Tipo','Categoria','Situacao','Valor']],
+    body: pendAcumuladas.length ? [...pendAcumuladas].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
+      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), (l.dataPrevista<hoje?'Atrasado':'No prazo'), fmtMoney(l.valor)
+    ]) : [['-','Nenhuma pendencia acumulada','','','','']],
+    theme:'striped', styles:{fontSize:8}, headStyles:{fillColor:[199,63,63]}, columnStyles:{5:{halign:'right'}}
+  });
+  y = doc.lastAutoTable.finalY + 22;
+
+  if(isAdmin() && DB.socios.length>0){
+    if(y > 620){ doc.addPage(); y = 40; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text('Divisao entre socios (lucro global, contas "no geral")', 40, y);
+
+    const lancGlobal = DB.lancamentos.filter(noPeriodo).filter(l=>lancamentoEntraNoConsolidado(l, null));
+    const entradasG = lancGlobal.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
+    const saidasG = lancGlobal.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
+    const impostosG = lancGlobal.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
+    const lucroGlobal = entradasG - saidasG - impostosG;
+    const retiradasPeriodo = DB.lancamentos.filter(l=>l.retirada && noPeriodo(l) && l.status==='Pago');
+    const competencia = dashModo==='ano' ? ano : comp;
+
+    const linhas = DB.socios.map(s=>{
+      const direito = lucroGlobal * ((s.percentual||0)/100);
+      const retiradoLanc = retiradasPeriodo.filter(l=>l.socioId===s.id).reduce((sum,l)=>sum+l.valor,0);
+      const ajuste = DB.ajustesSocios.find(a=>a.socioId===s.id && a.competencia===competencia);
+      const totalRetirado = retiradoLanc + (ajuste?ajuste.valor:0);
+      return { nome:s.nome, percentual:s.percentual, direito, totalRetirado, diferenca: direito-totalRetirado };
+    });
+
+    doc.autoTable({
+      startY:y+8,
+      head:[['Socio','%','Direito','Retirado','Diferenca']],
+      body: linhas.map(l=>[l.nome, `${(l.percentual||0).toFixed(2)}%`, fmtMoney(l.direito), fmtMoney(l.totalRetirado), fmtMoney(l.diferenca)]),
+      theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[13,79,196]}, columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}
+    });
+    y = doc.lastAutoTable.finalY + 16;
+
+    const credores = linhas.filter(l=>l.diferenca>0.01).map(l=>({nome:l.nome, valor:l.diferenca})).sort((a,b)=>b.valor-a.valor);
+    const devedores = linhas.filter(l=>l.diferenca<-0.01).map(l=>({nome:l.nome, valor:-l.diferenca})).sort((a,b)=>b.valor-a.valor);
+    const repasses = [];
+    let i=0, j=0;
+    while(i<devedores.length && j<credores.length){
+      const dev=devedores[i], cred=credores[j];
+      const valor = Math.min(dev.valor, cred.valor);
+      repasses.push(`${dev.nome} deve repassar ${fmtMoney(valor)} para ${cred.nome}`);
+      dev.valor -= valor; cred.valor -= valor;
+      if(dev.valor<0.01) i++;
+      if(cred.valor<0.01) j++;
+    }
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    if(repasses.length===0){
+      doc.text('Sem diferencas a acertar entre os socios neste periodo.', 40, y); y+=14;
+    }else{
+      repasses.forEach(r=>{ doc.text('- '+r, 40, y); y+=14; });
+    }
+  }
+
+  const sufixoEscopo = escopoLabel!=='Todas as contas' ? '_'+escopoLabel.replace(/[^a-zA-Z0-9]/g,'_') : '';
+  doc.save(`relatorio_softplus_${dashModo==='ano'?ano:comp}${sufixoEscopo}.pdf`);
+  toast('PDF gerado');
 }
 
 function confirmarLancamento(id){
@@ -1730,6 +2032,7 @@ function renderLancamentos(){
   }
   document.getElementById('btnImportarLancamentos').style.display = (eEntradas || eSaidas) ? '' : 'none';
   document.getElementById('btnTransferencia').style.display = podeTransferir() ? '' : 'none';
+  document.getElementById('btnRetirada').style.display = podeRetirarSocio() ? '' : 'none';
 
   let list = [...DB.lancamentos].sort((a,b)=>b.dataPrevista.localeCompare(a.dataPrevista));
   list = list.filter(l => (l.tipo==='entrada' && vEntradas) || (l.tipo==='saida' && vSaidas));
@@ -2396,6 +2699,119 @@ function excluirEmpresa(id){
   deleteRecord('empresas', id).then(()=>{ toast('Empresa excluída'); renderAll(); });
 }
 
+/* ---------- SOCIOS (ADMIN) ---------- */
+function somaPercentuaisSocios(){ return DB.socios.reduce((s,x)=>s+(x.percentual||0),0); }
+function renderSocios(){
+  if(!isAdmin()) return;
+  const tbody = document.querySelector('#sociosTable tbody');
+  if(!tbody) return;
+  const aviso = document.getElementById('socioSomaAviso');
+  const soma = somaPercentuaisSocios();
+  if(DB.socios.length>0 && Math.abs(soma-100)>0.01){
+    aviso.style.display = '';
+    aviso.textContent = `⚠ A soma dos percentuais está em ${soma.toFixed(2)}%, não em 100%. Ajuste os sócios para fechar corretamente.`;
+  }else{
+    aviso.style.display = 'none';
+  }
+  if(DB.socios.length===0){
+    tbody.innerHTML = `<tr><td colspan="3" class="empty"><b>Nenhum sócio cadastrado</b>Cadastre os sócios e o percentual de cada um sobre o lucro.</td></tr>`;
+    document.getElementById('pagSocios').innerHTML = '';
+    return;
+  }
+  const { pageItems, totalPages, currentPage, total } = paginate(DB.socios, 'socios');
+  renderPagination('pagSocios', 'socios', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(s=>`<tr>
+      <td>${s.nome}</td>
+      <td class="cell-num">${(s.percentual||0).toFixed(2)}%</td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Editar" onclick="editarSocio('${s.id}')">✎</button>
+        <button class="icon-btn" title="Excluir" onclick="excluirSocio('${s.id}')">✕</button>
+      </td>
+    </tr>`).join('');
+}
+document.getElementById('btnNovoSocio').onclick = ()=>{
+  if(!isAdmin()) return;
+  document.getElementById('modalSocioTitle').textContent='Novo sócio';
+  document.getElementById('socioId').value='';
+  document.getElementById('socioNome').value='';
+  document.getElementById('socioPercentual').value='';
+  openModal('overlaySocio');
+};
+function editarSocio(id){
+  if(!isAdmin()) return;
+  const s = DB.socios.find(x=>x.id===id); if(!s) return;
+  document.getElementById('modalSocioTitle').textContent='Editar sócio';
+  document.getElementById('socioId').value=s.id;
+  document.getElementById('socioNome').value=s.nome;
+  document.getElementById('socioPercentual').value=s.percentual;
+  openModal('overlaySocio');
+}
+function salvarSocio(){
+  if(!isAdmin()) return;
+  const nome = document.getElementById('socioNome').value.trim();
+  const percentual = parseFloat(document.getElementById('socioPercentual').value);
+  if(!nome){ toast('Informe o nome do sócio'); return; }
+  if(isNaN(percentual) || percentual<0 || percentual>100){ toast('Informe um percentual válido (0 a 100)'); return; }
+  const id = document.getElementById('socioId').value;
+  const data = { nome, percentual };
+  let rec;
+  if(id){ rec = DB.socios.find(s=>s.id===id); Object.assign(rec, data); }
+  else{ rec = {id:uid(), ...data}; DB.socios.push(rec); }
+  saveRecord('socios', rec).then(()=>{ closeModal('overlaySocio'); toast('Sócio salvo'); renderAll(); });
+}
+function excluirSocio(id){
+  if(!isAdmin()) return;
+  const vinculado = DB.lancamentos.some(l=>l.socioId===id) || DB.ajustesSocios.some(a=>a.socioId===id);
+  if(vinculado){ toast('Não é possível excluir: há retiradas ou ajustes vinculados a este sócio'); return; }
+  DB.socios = DB.socios.filter(s=>s.id!==id);
+  deleteRecord('socios', id).then(()=>{ toast('Sócio excluído'); renderAll(); });
+}
+
+/* ---------- RETIRADA DE SÓCIO ---------- */
+function podeRetirarSocio(){ return isAdmin(); }
+document.getElementById('btnRetirada').onclick = ()=>{
+  if(!podeRetirarSocio()) return;
+  if(DB.socios.length===0){ toast('Cadastre pelo menos um sócio antes de registrar retiradas'); return; }
+  if(DB.contas.length===0){ toast('Cadastre pelo menos uma conta'); return; }
+  document.getElementById('retiradaSocio').value='';
+  document.getElementById('retiradaConta').value='';
+  document.getElementById('retiradaValor').value='';
+  document.getElementById('retiradaData').value=todayISO();
+  document.getElementById('retiradaObs').value='';
+  openModal('overlayRetirada');
+};
+function salvarRetirada(){
+  if(!podeRetirarSocio()) return;
+  const socioNomeRaw = document.getElementById('retiradaSocio').value.trim();
+  const contaNomeRaw = document.getElementById('retiradaConta').value.trim();
+  const valor = parseFloat(document.getElementById('retiradaValor').value);
+  const data = document.getElementById('retiradaData').value;
+  const obs = document.getElementById('retiradaObs').value.trim();
+  if(!socioNomeRaw){ toast('Selecione o sócio'); return; }
+  const n = socioNomeRaw.trim().toLowerCase();
+  const socio = DB.socios.find(s=>s.nome.trim().toLowerCase()===n);
+  if(!socio){ toast('Sócio não encontrado — selecione um da lista'); return; }
+  if(!contaNomeRaw){ toast('Selecione a conta de origem'); return; }
+  const contaId = findContaId(contaNomeRaw);
+  if(contaId===undefined){ toast('Conta não encontrada — selecione uma da lista'); return; }
+  if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
+  if(!data){ toast('Informe a data'); return; }
+  const cat = getRetiradaCategoria();
+  if(!cat){ toast('Preparando categoria de retirada, tente novamente em instantes'); return; }
+  const novo = {
+    id:uid(), tipo:'saida', categoriaId:cat.id, contratoId:null, contaId,
+    descricao: obs || `Retirada de sócio — ${socio.nome}`,
+    valor, dataPrevista:data, status:'Pago', dataPagamento:data,
+    modeloId:null, retirada:true, socioId:socio.id
+  };
+  DB.lancamentos.push(novo);
+  saveRecord('lancamentos', novo).then(()=>{
+    closeModal('overlayRetirada');
+    toast(`Retirada de ${fmtMoney(valor)} registrada para ${socio.nome}`);
+    renderAll();
+  });
+}
+
 /* ---------- USUARIOS (ADMIN) ---------- */
 function renderUsuarios(){
   if(!isAdmin()) return;
@@ -2516,6 +2932,8 @@ document.getElementById('btnLogout').addEventListener('click', ()=>{
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 <script>
   var diagLines = [];
   function diag(msg){
