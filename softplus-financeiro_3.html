@@ -548,6 +548,7 @@
       <div class="field"><label>Valor (R$) <span class="required-mark">*</span></label><input type="number" step="0.01" id="retiradaValor" required></div>
       <div class="field"><label>Data <span class="required-mark">*</span></label><input type="date" id="retiradaData" required></div>
     </div>
+    <p id="retiradaSugestao" style="font-size:11.5px; color:var(--text-dim); margin-top:-8px; margin-bottom:14px;"></p>
     <div class="field"><label>Observação (opcional)</label><input type="text" id="retiradaObs"></div>
     <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios — não entra como despesa da empresa, é distribuição de lucro já apurado</p>
     <div class="modal-actions">
@@ -1632,13 +1633,8 @@ function renderDashboard(){
   renderDivisaoSocios(comp, ano);
 }
 
-function renderDivisaoSocios(comp, ano){
-  const bloco = document.getElementById('blockSocios');
-  if(!isAdmin() || DB.socios.length===0){ bloco.style.display='none'; return; }
-  bloco.style.display = '';
-
-  // Lucro GLOBAL (sem filtro de conta/empresa), das contas marcadas "no geral", no período selecionado no Painel
-  const noPeriodo = dashModo==='ano' ? l=>l.dataPrevista.slice(0,4)===ano : l=>compOf(l.dataPrevista)===comp;
+function calcularLinhasSocios(comp, ano, modo){
+  const noPeriodo = modo==='ano' ? l=>l.dataPrevista.slice(0,4)===ano : l=>compOf(l.dataPrevista)===comp;
   const lancGlobal = DB.lancamentos.filter(noPeriodo).filter(l=>lancamentoEntraNoConsolidado(l, null));
   const impostoId = catImpostoId();
   const entradasG = lancGlobal.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
@@ -1646,32 +1642,20 @@ function renderDivisaoSocios(comp, ano){
   const impostosG = lancGlobal.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
   const lucroGlobal = entradasG - saidasG - impostosG;
 
-  // Retiradas já registradas (lançamentos de retirada) no mesmo período, por sócio
   const retiradasPeriodo = DB.lancamentos.filter(l=>l.retirada && noPeriodo(l) && l.status==='Pago');
+  const competencia = modo==='ano' ? ano : comp;
 
-  const competencia = dashModo==='ano' ? ano : comp; // chave usada para o ajuste manual
-
-  const linhas = DB.socios.map(s=>{
+  return DB.socios.map(s=>{
     const direito = lucroGlobal * ((s.percentual||0)/100);
     const retiradoLanc = retiradasPeriodo.filter(l=>l.socioId===s.id).reduce((sum,l)=>sum+l.valor,0);
     const ajuste = DB.ajustesSocios.find(a=>a.socioId===s.id && a.competencia===competencia);
     const ajusteValor = ajuste ? ajuste.valor : 0;
     const totalRetirado = retiradoLanc + ajusteValor;
     const diferenca = direito - totalRetirado;
-    return { socio:s, direito, retiradoLanc, ajusteValor, totalRetirado, diferenca };
+    return { socio:s, direito, retiradoLanc, ajusteValor, totalRetirado, diferenca, competencia };
   });
-
-  const tbody = document.querySelector('#sociosResumoTable tbody');
-  tbody.innerHTML = linhas.map(l=>`<tr>
-      <td>${l.socio.nome}</td>
-      <td class="cell-num">${(l.socio.percentual||0).toFixed(2)}%</td>
-      <td class="cell-num">${fmtMoney(l.direito)}</td>
-      <td class="cell-num">${fmtMoney(l.retiradoLanc)}</td>
-      <td class="cell-num"><input type="number" step="0.01" value="${l.ajusteValor||''}" placeholder="0,00" style="width:100px; text-align:right;" onchange="salvarAjusteSocio('${l.socio.id}','${competencia}', this.value)"></td>
-      <td class="cell-num" style="color:${l.diferenca>=0?'var(--green)':'var(--red)'}">${fmtMoney(l.diferenca)}</td>
-    </tr>`).join('');
-
-  // Sugestão de repasses entre sócios para equilibrar
+}
+function calcularRepasses(linhas){
   const credores = linhas.filter(l=>l.diferenca>0.01).map(l=>({nome:l.socio.nome, valor:l.diferenca})).sort((a,b)=>b.valor-a.valor);
   const devedores = linhas.filter(l=>l.diferenca<-0.01).map(l=>({nome:l.socio.nome, valor:-l.diferenca})).sort((a,b)=>b.valor-a.valor);
   const repasses = [];
@@ -1684,6 +1668,27 @@ function renderDivisaoSocios(comp, ano){
     if(dev.valor<0.01) i++;
     if(cred.valor<0.01) j++;
   }
+  return repasses;
+}
+function renderDivisaoSocios(comp, ano){
+  const bloco = document.getElementById('blockSocios');
+  if(!isAdmin() || DB.socios.length===0){ bloco.style.display='none'; return; }
+  bloco.style.display = '';
+
+  const linhas = calcularLinhasSocios(comp, ano, dashModo);
+  const competencia = linhas.length ? linhas[0].competencia : (dashModo==='ano'?ano:comp);
+
+  const tbody = document.querySelector('#sociosResumoTable tbody');
+  tbody.innerHTML = linhas.map(l=>`<tr>
+      <td>${l.socio.nome}</td>
+      <td class="cell-num">${(l.socio.percentual||0).toFixed(2)}%</td>
+      <td class="cell-num">${fmtMoney(l.direito)}</td>
+      <td class="cell-num">${fmtMoney(l.retiradoLanc)}</td>
+      <td class="cell-num"><input type="number" step="0.01" value="${l.ajusteValor||''}" placeholder="0,00" style="width:100px; text-align:right;" onchange="salvarAjusteSocio('${l.socio.id}','${competencia}', this.value)"></td>
+      <td class="cell-num" style="color:${l.diferenca>=0?'var(--green)':'var(--red)'}">${fmtMoney(l.diferenca)}</td>
+    </tr>`).join('');
+
+  const repasses = calcularRepasses(linhas);
   const repassesEl = document.getElementById('sociosRepasses');
   if(repasses.length===0){
     repassesEl.innerHTML = `<p style="font-size:12.5px; color:var(--text-dim);">Sem diferenças a acertar entre os sócios neste período.</p>`;
@@ -1708,6 +1713,53 @@ document.getElementById('btnExportarPDF').onclick = ()=>{
   catch(e){ console.error('Erro ao gerar PDF', e); toast('Erro ao gerar o PDF'); }
 };
 
+function tabelaLancamentos(doc, y, titulo, lista){
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text(`${titulo} (${lista.length})`, 40, y); y+=6;
+  doc.autoTable({
+    startY: y+6,
+    head:[['Data','Descricao','Tipo','Categoria','Conta','Status','Valor']],
+    body: lista.length ? [...lista].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
+      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), l.contaId?contaNome(l.contaId):'-', l.status, fmtMoney(l.valor)
+    ]) : [['-','Nenhum lancamento','','','','','']],
+    theme:'striped', styles:{fontSize:8, cellPadding:3, overflow:'linebreak'}, headStyles:{fillColor:[13,79,196]},
+    columnStyles:{
+      0:{cellWidth:52}, 1:{cellWidth:'auto'}, 2:{cellWidth:42}, 3:{cellWidth:95},
+      4:{cellWidth:60}, 5:{cellWidth:48}, 6:{cellWidth:62, halign:'right'}
+    }
+  });
+  return doc.lastAutoTable.finalY + 18;
+}
+function tabelaPendencias(doc, y, titulo, lista, corCabecalho, comSituacao, hoje){
+  doc.setFont('helvetica','bold'); doc.setFontSize(11);
+  doc.text(`${titulo} (${lista.length})`, 40, y); y+=6;
+  const head = comSituacao ? ['Vencimento','Descricao','Tipo','Categoria','Situacao','Valor'] : ['Vencimento','Descricao','Tipo','Categoria','Valor'];
+  const body = lista.length ? [...lista].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>{
+    const linha = [fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId)];
+    if(comSituacao) linha.push(l.dataPrevista<hoje?'Atrasado':'No prazo');
+    linha.push(fmtMoney(l.valor));
+    return linha;
+  }) : [comSituacao ? ['-','Nenhuma pendencia','','','',''] : ['-','Nenhuma pendencia','','','']];
+  const colStyles = comSituacao
+    ? {0:{cellWidth:60},2:{cellWidth:42},3:{cellWidth:95},4:{cellWidth:55},5:{cellWidth:62,halign:'right'}}
+    : {0:{cellWidth:60},2:{cellWidth:42},3:{cellWidth:95},4:{cellWidth:62,halign:'right'}};
+  doc.autoTable({
+    startY:y+6, head:[head], body,
+    theme:'striped', styles:{fontSize:8, cellPadding:3, overflow:'linebreak'}, headStyles:{fillColor:corCabecalho}, columnStyles:colStyles
+  });
+  return doc.lastAutoTable.finalY + 18;
+}
+function resumoFinanceiro(lista, impostoId){
+  const entradas = lista.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
+  const saidas = lista.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
+  const impostos = lista.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
+  return { entradas, saidas, impostos, despesas: saidas+impostos, lucro: entradas-saidas-impostos };
+}
+function quebrarPaginaSeNecessario(doc, y, limite){
+  if(y > limite){ doc.addPage(); return 40; }
+  return y;
+}
+
 function exportarRelatorioPDF(){
   const comp = currentComp();
   const ano = comp.slice(0,4);
@@ -1719,128 +1771,115 @@ function exportarRelatorioPDF(){
   const escopoLabel = contaFiltro ? contaNome(contaFiltro) : (empresaFiltro ? empresaNome(empresaFiltro) : 'Todas as contas');
 
   const noPeriodo = dashModo==='ano' ? l=>l.dataPrevista.slice(0,4)===ano : l=>compOf(l.dataPrevista)===comp;
-  let lancPeriodo = DB.lancamentos.filter(noPeriodo);
-  if(escopoContaIds) lancPeriodo = lancPeriodo.filter(l=>escopoContaIds.includes(l.contaId) && lancamentoEntraNoConsolidado(l, escopoContaIds));
-  else lancPeriodo = lancPeriodo.filter(l=>lancamentoEntraNoConsolidado(l, null));
-
   const impostoId = catImpostoId();
-  const entradasPagas = lancPeriodo.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
-  const saidasPagas = lancPeriodo.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
-  const impostosPagos = lancPeriodo.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
-  const despesasTotais = saidasPagas + impostosPagos;
-  const lucro = entradasPagas - despesasTotais;
-
-  const pendPeriodo = lancPeriodo.filter(l=>l.status==='Pendente');
-
-  let pendAcumuladas = DB.lancamentos.filter(l=>l.status==='Pendente');
-  if(escopoContaIds) pendAcumuladas = pendAcumuladas.filter(l=>escopoContaIds.includes(l.contaId));
-  else pendAcumuladas = pendAcumuladas.filter(l=>contaEntraNoGeral(l.contaId));
+  const hoje = todayISO();
+  const LIMITE_PAGINA = 480; // altura útil em pt, paisagem A4
 
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const doc = new jsPDF({unit:'pt', format:'a4', orientation:'landscape'});
   let y = 40;
 
   doc.setFont('helvetica','bold'); doc.setFontSize(16);
   doc.text('SOFT+ — Relatorio Financeiro', 40, y); y+=20;
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
   const periodoLabel = dashModo==='ano' ? `Ano de ${ano}` : monthLabel(comp);
-  doc.text(`Periodo: ${periodoLabel}`, 40, y); y+=14;
-  doc.text(`Escopo: ${escopoLabel}`, 40, y); y+=14;
-  doc.text(`Gerado em ${fmtDate(todayISO())}`, 40, y); y+=20;
+  doc.text(`Periodo: ${periodoLabel}   |   Escopo: ${escopoLabel}   |   Gerado em ${fmtDate(hoje)}`, 40, y); y+=20;
 
+  // Resumo global no escopo já selecionado na tela
+  let lancEscopo = DB.lancamentos.filter(noPeriodo);
+  if(escopoContaIds) lancEscopo = lancEscopo.filter(l=>escopoContaIds.includes(l.contaId) && lancamentoEntraNoConsolidado(l, escopoContaIds));
+  else lancEscopo = lancEscopo.filter(l=>lancamentoEntraNoConsolidado(l, null));
+  const rGlobal = resumoFinanceiro(lancEscopo, impostoId);
   doc.autoTable({
     startY: y,
     head: [['Entradas recebidas','Saidas pagas','Impostos pagos','Total de despesas','Lucro liquido']],
-    body: [[fmtMoney(entradasPagas), fmtMoney(saidasPagas), fmtMoney(impostosPagos), fmtMoney(despesasTotais), fmtMoney(lucro)]],
+    body: [[fmtMoney(rGlobal.entradas), fmtMoney(rGlobal.saidas), fmtMoney(rGlobal.impostos), fmtMoney(rGlobal.despesas), fmtMoney(rGlobal.lucro)]],
     theme:'grid', styles:{fontSize:9, halign:'right'}, headStyles:{fillColor:[13,79,196]}
   });
-  y = doc.lastAutoTable.finalY + 22;
+  y = doc.lastAutoTable.finalY + 24;
 
-  doc.setFont('helvetica','bold'); doc.setFontSize(12);
-  doc.text(`Lancamentos do periodo (${lancPeriodo.length})`, 40, y);
-  doc.autoTable({
-    startY: y+8,
-    head:[['Data','Descricao','Tipo','Categoria','Conta','Status','Valor']],
-    body: lancPeriodo.length ? [...lancPeriodo].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
-      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), l.contaId?contaNome(l.contaId):'-', l.status, fmtMoney(l.valor)
-    ]) : [['-','Nenhum lancamento no periodo','','','','','']],
-    theme:'striped', styles:{fontSize:8}, headStyles:{fillColor:[13,79,196]}, columnStyles:{6:{halign:'right'}}
-  });
-  y = doc.lastAutoTable.finalY + 22;
+  if(escopoContaIds){
+    // Um único escopo já selecionado (uma conta ou uma empresa) — sem necessidade de dividir mais
+    const pendPeriodo = lancEscopo.filter(l=>l.status==='Pendente');
+    let pendAcum = DB.lancamentos.filter(l=>l.status==='Pendente' && escopoContaIds.includes(l.contaId));
+    y = tabelaLancamentos(doc, y, 'Lancamentos do periodo', lancEscopo);
+    y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+    y = tabelaPendencias(doc, y, 'Pendencias do periodo', pendPeriodo, [179,121,15], false, hoje);
+    y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+    y = tabelaPendencias(doc, y, 'Pendencias acumuladas — todo o historico', pendAcum, [199,63,63], true, hoje);
+  }else{
+    // Visão consolidada — divide por empresa
+    const empresasComConta = DB.empresas.filter(e=>contasDaEmpresa(e.id).length>0);
+    empresasComConta.forEach(emp=>{
+      const idsEmp = contasDaEmpresa(emp.id);
+      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text(`Empresa: ${emp.nome}`, 40, y); y+=16;
 
-  if(y > 680){ doc.addPage(); y = 40; }
-  doc.setFont('helvetica','bold'); doc.setFontSize(12);
-  doc.text(`Pendencias do periodo (${pendPeriodo.length})`, 40, y);
-  doc.autoTable({
-    startY:y+8,
-    head:[['Vencimento','Descricao','Tipo','Categoria','Valor']],
-    body: pendPeriodo.length ? [...pendPeriodo].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
-      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), fmtMoney(l.valor)
-    ]) : [['-','Nenhuma pendencia no periodo','','','']],
-    theme:'striped', styles:{fontSize:8}, headStyles:{fillColor:[179,121,15]}, columnStyles:{4:{halign:'right'}}
-  });
-  y = doc.lastAutoTable.finalY + 22;
+      let lancEmp = DB.lancamentos.filter(noPeriodo).filter(l=>idsEmp.includes(l.contaId) && lancamentoEntraNoConsolidado(l, idsEmp));
+      const rEmp = resumoFinanceiro(lancEmp, impostoId);
+      doc.autoTable({
+        startY:y,
+        head:[['Entradas','Saidas','Impostos','Despesas totais','Lucro']],
+        body:[[fmtMoney(rEmp.entradas), fmtMoney(rEmp.saidas), fmtMoney(rEmp.impostos), fmtMoney(rEmp.despesas), fmtMoney(rEmp.lucro)]],
+        theme:'grid', styles:{fontSize:9, halign:'right'}, headStyles:{fillColor:[91,149,196]}
+      });
+      y = doc.lastAutoTable.finalY + 14;
 
-  if(y > 650){ doc.addPage(); y = 40; }
-  doc.setFont('helvetica','bold'); doc.setFontSize(12);
-  doc.text(`Pendencias acumuladas — todo o historico (${pendAcumuladas.length})`, 40, y);
-  const hoje = todayISO();
-  doc.autoTable({
-    startY:y+8,
-    head:[['Vencimento','Descricao','Tipo','Categoria','Situacao','Valor']],
-    body: pendAcumuladas.length ? [...pendAcumuladas].sort((a,b)=>a.dataPrevista.localeCompare(b.dataPrevista)).map(l=>[
-      fmtDate(l.dataPrevista), l.descricao, l.tipo==='entrada'?'Entrada':'Saida', catName(l.categoriaId), (l.dataPrevista<hoje?'Atrasado':'No prazo'), fmtMoney(l.valor)
-    ]) : [['-','Nenhuma pendencia acumulada','','','','']],
-    theme:'striped', styles:{fontSize:8}, headStyles:{fillColor:[199,63,63]}, columnStyles:{5:{halign:'right'}}
-  });
-  y = doc.lastAutoTable.finalY + 22;
+      const pendPeriodoEmp = lancEmp.filter(l=>l.status==='Pendente');
+      const pendAcumEmp = DB.lancamentos.filter(l=>l.status==='Pendente' && idsEmp.includes(l.contaId));
 
-  if(isAdmin() && DB.socios.length>0){
-    if(y > 620){ doc.addPage(); y = 40; }
-    doc.setFont('helvetica','bold'); doc.setFontSize(12);
-    doc.text('Divisao entre socios (lucro global, contas "no geral")', 40, y);
-
-    const lancGlobal = DB.lancamentos.filter(noPeriodo).filter(l=>lancamentoEntraNoConsolidado(l, null));
-    const entradasG = lancGlobal.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
-    const saidasG = lancGlobal.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
-    const impostosG = lancGlobal.filter(l=>l.tipo==='saida' && l.status==='Pago' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
-    const lucroGlobal = entradasG - saidasG - impostosG;
-    const retiradasPeriodo = DB.lancamentos.filter(l=>l.retirada && noPeriodo(l) && l.status==='Pago');
-    const competencia = dashModo==='ano' ? ano : comp;
-
-    const linhas = DB.socios.map(s=>{
-      const direito = lucroGlobal * ((s.percentual||0)/100);
-      const retiradoLanc = retiradasPeriodo.filter(l=>l.socioId===s.id).reduce((sum,l)=>sum+l.valor,0);
-      const ajuste = DB.ajustesSocios.find(a=>a.socioId===s.id && a.competencia===competencia);
-      const totalRetirado = retiradoLanc + (ajuste?ajuste.valor:0);
-      return { nome:s.nome, percentual:s.percentual, direito, totalRetirado, diferenca: direito-totalRetirado };
+      y = tabelaLancamentos(doc, y, `Lancamentos do periodo — ${emp.nome}`, lancEmp);
+      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+      y = tabelaPendencias(doc, y, `Pendencias do periodo — ${emp.nome}`, pendPeriodoEmp, [179,121,15], false, hoje);
+      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+      y = tabelaPendencias(doc, y, `Pendencias acumuladas — ${emp.nome}`, pendAcumEmp, [199,63,63], true, hoje);
+      y += 14;
     });
 
-    doc.autoTable({
-      startY:y+8,
-      head:[['Socio','%','Direito','Retirado','Diferenca']],
-      body: linhas.map(l=>[l.nome, `${(l.percentual||0).toFixed(2)}%`, fmtMoney(l.direito), fmtMoney(l.totalRetirado), fmtMoney(l.diferenca)]),
-      theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[13,79,196]}, columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}
-    });
-    y = doc.lastAutoTable.finalY + 16;
-
-    const credores = linhas.filter(l=>l.diferenca>0.01).map(l=>({nome:l.nome, valor:l.diferenca})).sort((a,b)=>b.valor-a.valor);
-    const devedores = linhas.filter(l=>l.diferenca<-0.01).map(l=>({nome:l.nome, valor:-l.diferenca})).sort((a,b)=>b.valor-a.valor);
-    const repasses = [];
-    let i=0, j=0;
-    while(i<devedores.length && j<credores.length){
-      const dev=devedores[i], cred=credores[j];
-      const valor = Math.min(dev.valor, cred.valor);
-      repasses.push(`${dev.nome} deve repassar ${fmtMoney(valor)} para ${cred.nome}`);
-      dev.valor -= valor; cred.valor -= valor;
-      if(dev.valor<0.01) i++;
-      if(cred.valor<0.01) j++;
+    const idsSemEmpresa = DB.contas.filter(c=>!c.empresaId).map(c=>c.id);
+    if(idsSemEmpresa.length){
+      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+      doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text('Contas sem empresa vinculada', 40, y); y+=16;
+      let lancSemEmp = DB.lancamentos.filter(noPeriodo).filter(l=>idsSemEmpresa.includes(l.contaId) && lancamentoEntraNoConsolidado(l, idsSemEmpresa));
+      y = tabelaLancamentos(doc, y, 'Lancamentos do periodo', lancSemEmp);
+      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+      const pendPeriodoSemEmp = lancSemEmp.filter(l=>l.status==='Pendente');
+      const pendAcumSemEmp = DB.lancamentos.filter(l=>l.status==='Pendente' && idsSemEmpresa.includes(l.contaId));
+      y = tabelaPendencias(doc, y, 'Pendencias do periodo', pendPeriodoSemEmp, [179,121,15], false, hoje);
+      y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+      y = tabelaPendencias(doc, y, 'Pendencias acumuladas', pendAcumSemEmp, [199,63,63], true, hoje);
     }
-    doc.setFont('helvetica','normal'); doc.setFontSize(9);
-    if(repasses.length===0){
-      doc.text('Sem diferencas a acertar entre os socios neste periodo.', 40, y); y+=14;
+  }
+
+  // Divisão entre sócios — sempre tenta mostrar, com mensagem clara se não houver dados
+  if(isAdmin()){
+    y = quebrarPaginaSeNecessario(doc, y, LIMITE_PAGINA);
+    doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text('Divisao entre socios (lucro global, contas "no geral")', 40, y); y+=16;
+
+    if(DB.socios.length===0){
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      doc.text('Nenhum socio cadastrado (Menu > Socios).', 40, y); y+=16;
     }else{
-      repasses.forEach(r=>{ doc.text('- '+r, 40, y); y+=14; });
+      const linhas = calcularLinhasSocios(comp, ano, dashModo);
+
+      doc.autoTable({
+        startY:y,
+        head:[['Socio','%','Direito','Retirado','Diferenca']],
+        body: linhas.map(l=>[l.socio.nome, `${(l.socio.percentual||0).toFixed(2)}%`, fmtMoney(l.direito), fmtMoney(l.totalRetirado), fmtMoney(l.diferenca)]),
+        theme:'grid', styles:{fontSize:9}, headStyles:{fillColor:[13,79,196]}, columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}
+      });
+      y = doc.lastAutoTable.finalY + 16;
+
+      const repasses = calcularRepasses(linhas);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      if(repasses.length===0){
+        doc.text('Sem diferencas a acertar entre os socios neste periodo.', 40, y); y+=14;
+      }else{
+        repasses.forEach(r=>{ doc.text(`- ${r.de} deve repassar ${fmtMoney(r.valor)} para ${r.para}`, 40, y); y+=14; });
+      }
     }
   }
 
@@ -2778,8 +2817,28 @@ document.getElementById('btnRetirada').onclick = ()=>{
   document.getElementById('retiradaValor').value='';
   document.getElementById('retiradaData').value=todayISO();
   document.getElementById('retiradaObs').value='';
+  document.getElementById('retiradaSugestao').textContent='';
   openModal('overlayRetirada');
 };
+document.getElementById('retiradaSocio').addEventListener('input', ()=>{
+  const nome = document.getElementById('retiradaSocio').value.trim().toLowerCase();
+  const socio = DB.socios.find(s=>s.nome.trim().toLowerCase()===nome);
+  const sugestaoEl = document.getElementById('retiradaSugestao');
+  if(!socio){ sugestaoEl.textContent=''; return; }
+  const comp = currentComp();
+  const ano = comp.slice(0,4);
+  const linhas = calcularLinhasSocios(comp, ano, dashModo);
+  const linha = linhas.find(l=>l.socio.id===socio.id);
+  const periodoLabel = dashModo==='ano' ? `ano de ${ano}` : monthLabel(comp);
+  if(!linha){ sugestaoEl.textContent=''; return; }
+  if(linha.diferenca > 0.01){
+    document.getElementById('retiradaValor').value = linha.diferenca.toFixed(2);
+    sugestaoEl.textContent = `Sugerido com base no cálculo de sócios: ${fmtMoney(linha.diferenca)} ainda a retirar (${periodoLabel}). Pode editar se quiser outro valor.`;
+  }else{
+    document.getElementById('retiradaValor').value = '';
+    sugestaoEl.textContent = `Este sócio já retirou tudo (ou mais) do que tinha direito no período (${periodoLabel}). Diferença atual: ${fmtMoney(linha.diferenca)}.`;
+  }
+});
 function salvarRetirada(){
   if(!podeRetirarSocio()) return;
   const socioNomeRaw = document.getElementById('retiradaSocio').value.trim();
