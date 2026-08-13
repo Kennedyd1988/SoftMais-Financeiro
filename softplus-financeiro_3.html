@@ -212,6 +212,7 @@
   <button class="nav-btn" data-view="clientes"><span class="nav-dot"></span>Clientes</button>
   <button class="nav-btn" data-view="modelos"><span class="nav-dot"></span>Modelos recorrentes</button>
   <button class="nav-btn" data-view="relatorios"><span class="nav-dot"></span>Relatórios</button>
+  <button class="nav-btn" data-view="empresas" id="navEmpresas" style="display:none;"><span class="nav-dot"></span>Empresas</button>
   <button class="nav-btn" data-view="contas" id="navContas" style="display:none;"><span class="nav-dot"></span>Contas</button>
   <button class="nav-btn" data-view="usuarios" id="navUsuarios" style="display:none;"><span class="nav-dot"></span>Usuários</button>
 
@@ -232,7 +233,12 @@
         <div class="view-desc">Visão geral do mês selecionado</div>
       </div>
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <select id="dashEmpresaFiltro"><option value="">Todas as empresas</option></select>
         <select id="dashContaFiltro"><option value="">Todas as contas</option></select>
+        <div class="filters" style="margin:0;">
+          <button class="btn btn-sm" id="btnModoMes">Mês</button>
+          <button class="btn btn-sm" id="btnModoAno">Ano inteiro</button>
+        </div>
         <div class="stamp">
           <button id="dashPrev">‹</button>
           <span id="dashMonthLabel">—</span>
@@ -378,6 +384,7 @@
         <div class="view-title">Relatórios</div>
         <div class="view-desc">Entradas, saídas, impostos e lucro por mês</div>
       </div>
+      <select id="relEmpresaFiltro"><option value="">Todas as empresas</option></select>
       <select id="relContaFiltro"><option value="">Todas as contas</option></select>
     </div>
 
@@ -407,6 +414,30 @@
     </section>
   </section>
 
+  <!-- EMPRESAS -->
+  <section class="view" id="view-empresas">
+    <div class="view-header">
+      <div>
+        <div class="view-title">Empresas</div>
+        <div class="view-desc">As empresas que operam nesse sistema — cada conta pertence a uma delas</div>
+      </div>
+      <button class="btn btn-primary" id="btnNovaEmpresa">+ Nova empresa</button>
+    </div>
+    <div class="filters" id="ieEmpresas">
+      <button class="btn btn-ghost btn-sm" onclick="baixarModelo('empresas')">⬇ Baixar modelo</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportarTabela('empresas')">⬆ Exportar</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('fileEmpresas').click()">📄 Importar</button>
+      <input type="file" id="fileEmpresas" accept=".csv" style="display:none" onchange="importarArquivo('empresas', this)">
+    </div>
+    <div class="card table-scroll" style="padding:0;">
+      <table id="empresasTable">
+        <thead><tr><th>Nome</th><th>Observações</th><th style="text-align:right">Saldo total</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="pagEmpresas"></div>
+  </section>
+
   <!-- CONTAS -->
   <section class="view" id="view-contas">
     <div class="view-header">
@@ -424,7 +455,7 @@
     </div>
     <div class="card table-scroll" style="padding:0;">
       <table id="contasTable">
-        <thead><tr><th>Nome</th><th>Observações</th><th>Fluxo geral</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Empresa</th><th>Observações</th><th>Fluxo geral</th><th style="text-align:right">Saldo</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -477,11 +508,30 @@
   </div>
 </div>
 
+<!-- MODAL EMPRESA -->
+<div class="overlay" id="overlayEmpresa">
+  <div class="modal">
+    <h3 id="modalEmpresaTitle">Nova empresa</h3>
+    <input type="hidden" id="empresaId">
+    <div class="field"><label>Nome da empresa <span class="required-mark">*</span></label><input type="text" id="empresaNome" placeholder="Ex: SOFT+" required></div>
+    <div class="field"><label>Observações</label><input type="text" id="empresaObs"></div>
+    <p class="field-hint"><span class="required-mark">*</span> campos obrigatórios</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('overlayEmpresa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEmpresa()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL CONTA -->
 <div class="overlay" id="overlayConta">
   <div class="modal">
     <h3 id="modalContaTitle">Nova conta</h3>
     <input type="hidden" id="contaId">
+    <div class="field"><label>Empresa <span class="required-mark">*</span></label>
+      <input type="text" id="contaEmpresa" list="dlEmpresas" placeholder="Digite para buscar..." autocomplete="off" required>
+      <datalist id="dlEmpresas"></datalist>
+    </div>
     <div class="field"><label>Nome da conta <span class="required-mark">*</span></label><input type="text" id="contaNome" placeholder="Ex: Caixa principal, Conta reserva, Sócio A..." required></div>
     <div class="field"><label>Observações</label><input type="text" id="contaObs"></div>
     <div class="checkbox-row"><input type="checkbox" id="contaConsiderarGeral" checked> <label for="contaConsiderarGeral">Considerar esta conta no cálculo geral de fluxo de caixa (Painel/Relatórios em "Todas as contas")</label></div>
@@ -659,7 +709,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[], contas:[] };
+let DB = { clientes:[], contratos:[], categorias:[], modelos:[], lancamentos:[], usuarios:[], contas:[], empresas:[] };
 let dashDate = new Date();
 let currentUser = null;
 
@@ -716,7 +766,7 @@ function toast(msg){
 
 /* ---------- PAGINAÇÃO ---------- */
 const PAGE_SIZE = 25;
-const pageState = { lancamentos:1, contratos:1, clientes:1, modelos:1, contas:1, usuarios:1 };
+const pageState = { lancamentos:1, contratos:1, clientes:1, modelos:1, contas:1, usuarios:1, empresas:1 };
 function paginate(list, key){
   const total = list.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -743,7 +793,7 @@ function changePage(key, delta){
   renderAll();
 }
 
-const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios','contas'];
+const TABLE_KEYS = ['clientes','contratos','categorias','modelos','lancamentos','usuarios','contas','empresas'];
 const loadedTables = new Set();
 
 function seedCategoriasIfNeeded(){
@@ -842,18 +892,42 @@ function catImpostoId(){ const c=DB.categorias.find(x=>x.nome==='Imposto'); retu
 function clienteNome(id){ const c=DB.clientes.find(x=>x.id===id); return c?c.nome:'—'; }
 function contratoLabel(id){ const c=DB.contratos.find(x=>x.id===id); if(!c) return '—'; return `${clienteNome(c.clienteId)} — ${c.objeto}`; }
 function contaNome(id){ const c=DB.contas.find(x=>x.id===id); return c?c.nome:'—'; }
+function empresaNome(id){ const e=DB.empresas.find(x=>x.id===id); return e?e.nome:'—'; }
+function contasDaEmpresa(empresaId){ return DB.contas.filter(c=>c.empresaId===empresaId).map(c=>c.id); }
 function contaEntraNoGeral(contaId){
   if(!contaId) return true;
   const c = DB.contas.find(x=>x.id===contaId);
   return c ? (c.considerarGeral !== false) : true;
 }
-function lancamentoEntraNoConsolidado(l){
-  if(!l.transferencia) return contaEntraNoGeral(l.contaId);
-  const geralAqui = contaEntraNoGeral(l.contaId);
+/**
+ * Decide se um lançamento entra numa apuração consolidada.
+ * escopoContaIds: null = visão global (todas as empresas/contas);
+ *                 array = visão restrita a uma empresa ou a uma conta específica.
+ */
+function lancamentoEntraNoConsolidado(l, escopoContaIds){
+  if(!l.transferencia){
+    if(escopoContaIds) return escopoContaIds.includes(l.contaId);
+    return contaEntraNoGeral(l.contaId);
+  }
   const par = DB.lancamentos.find(x=>x.transferGrupoId===l.transferGrupoId && x.id!==l.id);
-  const geralLa = par ? contaEntraNoGeral(par.contaId) : true;
+  if(!par) return escopoContaIds ? escopoContaIds.includes(l.contaId) : true;
+
+  if(escopoContaIds){
+    const aquiNoEscopo = escopoContaIds.includes(l.contaId);
+    const laNoEscopo = escopoContaIds.includes(par.contaId);
+    if(aquiNoEscopo && laNoEscopo) return false; // troca interna dentro do escopo, neutra
+    return aquiNoEscopo; // atravessou a fronteira do escopo (empresa/conta) — conta como movimento real
+  }
+  const geralAqui = contaEntraNoGeral(l.contaId);
+  const geralLa = contaEntraNoGeral(par.contaId);
   if(geralAqui === geralLa) return false; // mesma "família" de contas — movimento interno, neutro
-  return geralAqui; // atravessou a fronteira — conta só do lado "no geral"
+  return geralAqui; // atravessou a fronteira "no geral" — conta só do lado "no geral"
+}
+function saldoDeContas(contaIds){
+  const pagos = DB.lancamentos.filter(l=>l.status==='Pago' && contaIds.includes(l.contaId));
+  const entradas = pagos.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
+  const saidas = pagos.filter(l=>l.tipo==='saida').reduce((s,l)=>s+l.valor,0);
+  return entradas - saidas;
 }
 
 /* ---------- CSV ENGINE (Exportar / Importar / Modelo) ---------- */
@@ -941,15 +1015,31 @@ const IMPORT_EXPORT_CONFIG = {
       return {id:(row.ID||'').trim(), record:{nome, cnpj:(row.CNPJ||'').trim(), contato:(row.Contato||'').trim(), obs:(row.Observacoes||'').trim()}};
     }
   },
-  contas: {
-    label:'Contas',
+  empresas: {
+    label:'Empresas',
     headers:['ID','Nome','Observacoes'],
-    example:{ID:'', Nome:'Caixa principal', Observacoes:''},
-    toRow(c){ return {ID:c.id, Nome:c.nome, Observacoes:c.obs||''}; },
+    example:{ID:'', Nome:'SOFT+', Observacoes:''},
+    toRow(e){ return {ID:e.id, Nome:e.nome, Observacoes:e.obs||''}; },
     fromRow(row){
       const nome=(row.Nome||'').trim();
       if(!nome) return {error:'coluna Nome vazia'};
       return {id:(row.ID||'').trim(), record:{nome, obs:(row.Observacoes||'').trim()}};
+    }
+  },
+  contas: {
+    label:'Contas',
+    headers:['ID','Empresa','Nome','ConsiderarGeral','Observacoes'],
+    example:{ID:'', Empresa:'SOFT+', Nome:'Caixa principal', ConsiderarGeral:'Sim', Observacoes:''},
+    toRow(c){ return {ID:c.id, Empresa:c.empresaId?empresaNome(c.empresaId):'', Nome:c.nome, ConsiderarGeral:(c.considerarGeral!==false)?'Sim':'Não', Observacoes:c.obs||''}; },
+    fromRow(row){
+      const nome=(row.Nome||'').trim();
+      const empresaNomeRaw=(row.Empresa||'').trim();
+      if(!nome) return {error:'coluna Nome vazia'};
+      if(!empresaNomeRaw) return {error:'coluna Empresa vazia'};
+      const empresaId = findEmpresaId(empresaNomeRaw);
+      if(empresaId===undefined) return {error:`empresa "${empresaNomeRaw}" não encontrada`};
+      const considerarGeral = (row.ConsiderarGeral||'').trim()==='' || /^(sim|s|true|1)$/i.test((row.ConsiderarGeral||'').trim());
+      return {id:(row.ID||'').trim(), record:{nome, empresaId, considerarGeral, obs:(row.Observacoes||'').trim()}};
     }
   },
   contratos: {
@@ -1065,6 +1155,7 @@ function canViewTable(key){
     case 'clientes': return canView('clientes');
     case 'contratos': return canView('contratos');
     case 'contas': return isAdmin();
+    case 'empresas': return isAdmin();
     case 'modelos': return canView('modelosEntradas') || canView('modelosSaidas');
     case 'lancamentos': return canView('lancEntradas') || canView('lancSaidas');
     default: return false;
@@ -1075,6 +1166,7 @@ function canEditTable(key){
     case 'clientes': return canEdit('clientes');
     case 'contratos': return canEdit('contratos');
     case 'contas': return isAdmin();
+    case 'empresas': return isAdmin();
     case 'modelos': return canEdit('modelosEntradas') || canEdit('modelosSaidas');
     case 'lancamentos': return canEdit('lancEntradas') || canEdit('lancSaidas');
     default: return false;
@@ -1145,6 +1237,7 @@ function viewIsAllowed(view){
     case 'relatorios': return canView('relatorios');
     case 'usuarios': return isAdmin();
     case 'contas': return isAdmin();
+    case 'empresas': return isAdmin();
     default: return false;
   }
 }
@@ -1181,8 +1274,19 @@ document.querySelectorAll('.nav-btn').forEach(btn=>{
 
 function currentComp(){ return dashDate.toISOString().slice(0,7); }
 
-document.getElementById('dashPrev').onclick=()=>{ dashDate.setMonth(dashDate.getMonth()-1); renderAll(); };
-document.getElementById('dashNext').onclick=()=>{ dashDate.setMonth(dashDate.getMonth()+1); renderAll(); };
+let dashModo = 'mes'; // 'mes' | 'ano'
+document.getElementById('dashPrev').onclick=()=>{
+  if(dashModo==='ano') dashDate.setFullYear(dashDate.getFullYear()-1);
+  else dashDate.setMonth(dashDate.getMonth()-1);
+  renderAll();
+};
+document.getElementById('dashNext').onclick=()=>{
+  if(dashModo==='ano') dashDate.setFullYear(dashDate.getFullYear()+1);
+  else dashDate.setMonth(dashDate.getMonth()+1);
+  renderAll();
+};
+document.getElementById('btnModoMes').onclick=()=>{ dashModo='mes'; renderAll(); };
+document.getElementById('btnModoAno').onclick=()=>{ dashModo='ano'; renderAll(); };
 document.getElementById('dashContaFiltro').addEventListener('change', renderDashboard);
 
 /* ---------- RENDER ALL ---------- */
@@ -1196,6 +1300,7 @@ function renderAll(){
   renderRelatorios();
   renderUsuarios();
   renderContas();
+  renderEmpresas();
   fillSelects();
 }
 
@@ -1223,17 +1328,39 @@ function fillSelects(){
   fillDatalist('dlClientes', sortByLabel(DB.clientes, c=>c.nome).map(c=>c.nome));
   fillDatalist('dlContas', sortByLabel(DB.contas, c=>c.nome).map(c=>c.nome));
   fillDatalist('dlContratos', sortByLabel(DB.contratos, c=>contratoLabel(c.id)).map(c=>contratoLabel(c.id)));
+  fillDatalist('dlEmpresas', sortByLabel(DB.empresas, e=>e.nome).map(e=>e.nome));
   refreshCategoriaDatalist('dlCategoriasModelo', document.getElementById('modeloTipo').value);
   refreshCategoriaDatalist('dlCategoriasLanc', document.getElementById('lancTipo').value);
 
   // Selects simples de filtro — continuam <select>, só ordenados alfabeticamente
   const contaOptsTodas = '<option value="">Todas as contas</option>' + sortByLabel(DB.contas, c=>c.nome).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
   setOptionsPreserveValue(document.getElementById('filtroConta'), contaOptsTodas);
-  setOptionsPreserveValue(document.getElementById('dashContaFiltro'), contaOptsTodas);
-  setOptionsPreserveValue(document.getElementById('relContaFiltro'), contaOptsTodas);
+
+  const empresaOptsTodas = '<option value="">Todas as empresas</option>' + sortByLabel(DB.empresas, e=>e.nome).map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  setOptionsPreserveValue(document.getElementById('dashEmpresaFiltro'), empresaOptsTodas);
+  setOptionsPreserveValue(document.getElementById('relEmpresaFiltro'), empresaOptsTodas);
+
+  atualizarContaFiltroPorEmpresa('dashEmpresaFiltro', 'dashContaFiltro');
+  atualizarContaFiltroPorEmpresa('relEmpresaFiltro', 'relContaFiltro');
 
   renderModeloContratoLista();
 }
+function atualizarContaFiltroPorEmpresa(empresaSelId, contaSelId){
+  const empresaId = document.getElementById(empresaSelId).value;
+  const contasFiltradas = empresaId ? DB.contas.filter(c=>c.empresaId===empresaId) : DB.contas;
+  const opts = '<option value="">Todas as contas</option>' + sortByLabel(contasFiltradas, c=>c.nome).map(c=>`<option value="${c.id}">${c.nome}</option>`).join('');
+  setOptionsPreserveValue(document.getElementById(contaSelId), opts);
+}
+document.getElementById('dashEmpresaFiltro').addEventListener('change', ()=>{
+  document.getElementById('dashContaFiltro').value='';
+  atualizarContaFiltroPorEmpresa('dashEmpresaFiltro','dashContaFiltro');
+  renderDashboard();
+});
+document.getElementById('relEmpresaFiltro').addEventListener('change', ()=>{
+  document.getElementById('relContaFiltro').value='';
+  atualizarContaFiltroPorEmpresa('relEmpresaFiltro','relContaFiltro');
+  renderRelatorios();
+});
 document.getElementById('modeloTipo').addEventListener('change', e=>refreshCategoriaDatalist('dlCategoriasModelo', e.target.value));
 document.getElementById('lancTipo').addEventListener('change', e=>refreshCategoriaDatalist('dlCategoriasLanc', e.target.value));
 
@@ -1309,18 +1436,32 @@ document.getElementById('modeloConta').addEventListener('input', ()=>{
 /* ---------- DASHBOARD ---------- */
 function renderDashboard(){
   const comp = currentComp();
-  document.getElementById('dashMonthLabel').textContent = monthLabel(comp);
+  const ano = comp.slice(0,4);
+  document.getElementById('dashMonthLabel').textContent = dashModo==='ano' ? ano : monthLabel(comp);
+  document.getElementById('btnModoMes').className = 'btn btn-sm' + (dashModo==='mes' ? ' btn-primary' : '');
+  document.getElementById('btnModoAno').className = 'btn btn-sm' + (dashModo==='ano' ? ' btn-primary' : '');
 
   const modoGeral = canView('painelGeral');
   const podeEditarPainel = canEdit('painelGeral');
 
+  const empresaSel = document.getElementById('dashEmpresaFiltro');
   const contaSel = document.getElementById('dashContaFiltro');
+  empresaSel.style.display = modoGeral ? '' : 'none';
   contaSel.style.display = modoGeral ? '' : 'none';
+  const empresaFiltro = modoGeral ? empresaSel.value : '';
   const contaFiltro = modoGeral ? contaSel.value : '';
 
-  let lancComp = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp);
-  if(contaFiltro) lancComp = lancComp.filter(l=>l.contaId===contaFiltro);
-  else lancComp = lancComp.filter(l=>lancamentoEntraNoConsolidado(l));
+  let escopoContaIds = null;
+  if(contaFiltro) escopoContaIds = [contaFiltro];
+  else if(empresaFiltro) escopoContaIds = contasDaEmpresa(empresaFiltro);
+
+  const noPeriodo = dashModo==='ano'
+    ? l => l.dataPrevista.slice(0,4)===ano
+    : l => compOf(l.dataPrevista)===comp;
+
+  let lancComp = DB.lancamentos.filter(noPeriodo);
+  if(escopoContaIds) lancComp = lancComp.filter(l=>escopoContaIds.includes(l.contaId) && lancamentoEntraNoConsolidado(l, escopoContaIds));
+  else lancComp = lancComp.filter(l=>lancamentoEntraNoConsolidado(l, null));
   const impostoId = catImpostoId();
 
   const entradasPagas = lancComp.filter(l=>l.tipo==='entrada' && l.status==='Pago').reduce((s,l)=>s+l.valor,0);
@@ -1330,10 +1471,17 @@ function renderDashboard(){
   const lucro = entradasPagas - despesasTotais;
 
   const pendentes = lancComp.filter(l=>l.status==='Pendente');
-  const pendentesValor = pendentes.reduce((s,l)=>s+l.valor,0);
+  const pendentesReceber = pendentes.filter(l=>l.tipo==='entrada');
+  const pendentesPagar = pendentes.filter(l=>l.tipo==='saida');
+  const pendentesReceberValor = pendentesReceber.reduce((s,l)=>s+l.valor,0);
+  const pendentesPagarValor = pendentesPagar.reduce((s,l)=>s+l.valor,0);
 
-  const contratosAtivosFiltrados = DB.contratos.filter(c=>c.status==='Ativo' && (contaFiltro ? c.contaId===contaFiltro : contaEntraNoGeral(c.contaId)));
+  const contratosAtivosFiltrados = DB.contratos.filter(c=>c.status==='Ativo' && (escopoContaIds ? escopoContaIds.includes(c.contaId) : contaEntraNoGeral(c.contaId)));
   const mrr = contratosAtivosFiltrados.reduce((s,c)=>s+(c.valorMensal||0),0);
+
+  const idsSaldo = escopoContaIds || DB.contas.map(c=>c.id);
+  const saldoCaixa = saldoDeContas(idsSaldo);
+  const escopoLabel = contaFiltro ? contaNome(contaFiltro) : (empresaFiltro ? empresaNome(empresaFiltro) : '');
 
   const hoje = todayISO();
   const em60 = new Date(); em60.setDate(em60.getDate()+60);
@@ -1348,6 +1496,7 @@ function renderDashboard(){
       <div class="card"><div class="metric-label">Impostos pagos</div><div class="metric-value neg num">${fmtMoney(impostosPagos)}</div></div>
       <div class="card"><div class="metric-label">Total de despesas (saídas + impostos)</div><div class="metric-value neg num">${fmtMoney(despesasTotais)}</div></div>
       <div class="card"><div class="metric-label">Lucro líquido</div><div class="metric-value ${lucro>=0?'pos':'neg'} num">${fmtMoney(lucro)}</div></div>
+      <div class="card"><div class="metric-label">Saldo em caixa${escopoLabel?` — ${escopoLabel}`:''}</div><div class="metric-value ${saldoCaixa>=0?'pos':'neg'} num">${fmtMoney(saldoCaixa)}</div><div class="metric-sub">acumulado, todas as datas</div></div>
     `;
   }else{
     document.getElementById('dashCards').innerHTML = '';
@@ -1356,9 +1505,10 @@ function renderDashboard(){
 
   document.getElementById('dashCards2').innerHTML = `
     ${modoGeral
-      ? `<div class="card"><div class="metric-label">Receita recorrente mensal (MRR)${contaFiltro?` — ${contaNome(contaFiltro)}`:''}</div><div class="metric-value num">${fmtMoney(mrr)}</div><div class="metric-sub">${contratosAtivosFiltrados.length} contrato(s) ativo(s)</div></div>`
+      ? `<div class="card"><div class="metric-label">Receita recorrente mensal (MRR)${contaFiltro?` — ${contaNome(contaFiltro)}`:(empresaFiltro?` — ${empresaNome(empresaFiltro)}`:'')}</div><div class="metric-value num">${fmtMoney(mrr)}</div><div class="metric-sub">${contratosAtivosFiltrados.length} contrato(s) ativo(s)</div></div>`
       : `<div class="card"><div class="metric-label">Contratos ativos</div><div class="metric-value num">${contratosAtivosFiltrados.length}</div></div>`}
-    ${modoGeral ? `<div class="card"><div class="metric-label">Pendentes no mês</div><div class="metric-value num">${fmtMoney(pendentesValor)}</div><div class="metric-sub">${pendentes.length} lançamento(s)</div></div>` : ''}
+    ${modoGeral ? `<div class="card"><div class="metric-label">A receber (pendente)</div><div class="metric-value num">${fmtMoney(pendentesReceberValor)}</div><div class="metric-sub">${pendentesReceber.length} lançamento(s)</div></div>` : ''}
+    ${modoGeral ? `<div class="card"><div class="metric-label">A pagar (pendente)</div><div class="metric-value num">${fmtMoney(pendentesPagarValor)}</div><div class="metric-sub">${pendentesPagar.length} lançamento(s)</div></div>` : ''}
     <div class="card"><div class="metric-label">Contratos a vencer</div><div class="metric-value num">${contratosVencer.length}</div><div class="metric-sub">nos próximos 60 dias</div></div>
   `;
 
@@ -1367,9 +1517,10 @@ function renderDashboard(){
     pendentesBlock.style.display = 'none';
   }else{
     pendentesBlock.style.display = '';
+    document.querySelector('#dashPendentesTable').closest('section.block').querySelector('.block-title').textContent = dashModo==='ano' ? `Pendentes no ano` : 'Pendentes neste mês';
     const tbody = document.querySelector('#dashPendentesTable tbody');
     if(pendentes.length===0){
-      tbody.innerHTML = `<tr><td colspan="5" class="empty"><b>Nenhum pendente</b>Todos os lançamentos deste mês já foram confirmados.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" class="empty"><b>Nenhum pendente</b>Todos os lançamentos do período já foram confirmados.</td></tr>`;
     }else{
       tbody.innerHTML = pendentes.map(l=>{
         const atrasado = l.dataPrevista < hoje;
@@ -2041,11 +2192,11 @@ function ultimosMeses(n){
   }
   return arr;
 }
-function resumoMes(comp, contaId){
+function resumoMes(comp, escopoContaIds){
   const impostoId = catImpostoId();
   let list = DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago');
-  if(contaId) list = list.filter(l=>l.contaId===contaId);
-  else list = list.filter(l=>lancamentoEntraNoConsolidado(l));
+  if(escopoContaIds) list = list.filter(l=>escopoContaIds.includes(l.contaId) && lancamentoEntraNoConsolidado(l, escopoContaIds));
+  else list = list.filter(l=>lancamentoEntraNoConsolidado(l, null));
   const entradas = list.filter(l=>l.tipo==='entrada').reduce((s,l)=>s+l.valor,0);
   const impostos = list.filter(l=>l.tipo==='saida' && l.categoriaId===impostoId).reduce((s,l)=>s+l.valor,0);
   const saidas = list.filter(l=>l.tipo==='saida' && l.categoriaId!==impostoId).reduce((s,l)=>s+l.valor,0);
@@ -2053,8 +2204,13 @@ function resumoMes(comp, contaId){
 }
 function renderRelatorios(){
   const contaFiltro = document.getElementById('relContaFiltro').value;
+  const empresaFiltro = document.getElementById('relEmpresaFiltro').value;
+  let escopoContaIds = null;
+  if(contaFiltro) escopoContaIds = [contaFiltro];
+  else if(empresaFiltro) escopoContaIds = contasDaEmpresa(empresaFiltro);
+
   const meses = ultimosMeses(6);
-  const dados = meses.map(m=>({m, ...resumoMes(m, contaFiltro)}));
+  const dados = meses.map(m=>({m, ...resumoMes(m, escopoContaIds)}));
   const maxVal = Math.max(1, ...dados.map(d=>Math.max(d.entradas, d.saidas+d.impostos)));
 
   document.getElementById('relBars').innerHTML = dados.map(d=>{
@@ -2083,7 +2239,7 @@ function renderRelatorios(){
 
   const comp = currentComp();
   const porCliente = {};
-  DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago' && l.tipo==='entrada' && l.contratoId && (contaFiltro ? l.contaId===contaFiltro : contaEntraNoGeral(l.contaId))).forEach(l=>{
+  DB.lancamentos.filter(l=>compOf(l.dataPrevista)===comp && l.status==='Pago' && l.tipo==='entrada' && l.contratoId && (escopoContaIds ? escopoContaIds.includes(l.contaId) : contaEntraNoGeral(l.contaId))).forEach(l=>{
     const contrato = DB.contratos.find(c=>c.id===l.contratoId);
     if(!contrato) return;
     const cli = clienteNome(contrato.clienteId);
@@ -2105,7 +2261,7 @@ function renderContas(){
   const tbody = document.querySelector('#contasTable tbody');
   if(!tbody) return;
   if(DB.contas.length===0){
-    tbody.innerHTML = `<tr><td colspan="4" class="empty"><b>Nenhuma conta cadastrada</b>Crie contas para dividir os lançamentos (não precisa ser bancária).</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty"><b>Nenhuma conta cadastrada</b>Crie contas para dividir os lançamentos (não precisa ser bancária).</td></tr>`;
     document.getElementById('pagContas').innerHTML = '';
     return;
   }
@@ -2113,10 +2269,13 @@ function renderContas(){
   renderPagination('pagContas', 'contas', totalPages, currentPage, total);
   tbody.innerHTML = pageItems.map(c=>{
     const entraGeral = c.considerarGeral !== false;
+    const saldo = saldoDeContas([c.id]);
     return `<tr>
       <td>${c.nome}</td>
+      <td>${c.empresaId?empresaNome(c.empresaId):'<span style="color:var(--red);">sem empresa</span>'}</td>
       <td style="color:var(--text-dim);">${c.obs||'—'}</td>
       <td><span class="badge ${entraGeral?'badge-green':'badge-gray'}">${entraGeral?'No geral':'Fora do geral'}</span></td>
+      <td class="cell-num" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fmtMoney(saldo)}</td>
       <td class="row-actions">
         <button class="icon-btn" title="Editar" onclick="editarConta('${c.id}')">✎</button>
         <button class="icon-btn" title="Excluir" onclick="excluirConta('${c.id}')">✕</button>
@@ -2126,8 +2285,10 @@ function renderContas(){
 }
 document.getElementById('btnNovaConta').onclick = ()=>{
   if(!isAdmin()) return;
+  if(DB.empresas.length===0){ toast('Cadastre uma empresa antes de criar uma conta'); return; }
   document.getElementById('modalContaTitle').textContent='Nova conta';
   document.getElementById('contaId').value='';
+  document.getElementById('contaEmpresa').value='';
   document.getElementById('contaNome').value='';
   document.getElementById('contaObs').value='';
   document.getElementById('contaConsiderarGeral').checked=true;
@@ -2138,6 +2299,7 @@ function editarConta(id){
   const c = DB.contas.find(x=>x.id===id); if(!c) return;
   document.getElementById('modalContaTitle').textContent='Editar conta';
   document.getElementById('contaId').value=c.id;
+  document.getElementById('contaEmpresa').value=c.empresaId?empresaNome(c.empresaId):'';
   document.getElementById('contaNome').value=c.nome;
   document.getElementById('contaObs').value=c.obs||'';
   document.getElementById('contaConsiderarGeral').checked = c.considerarGeral !== false;
@@ -2145,10 +2307,14 @@ function editarConta(id){
 }
 function salvarConta(){
   if(!isAdmin()) return;
+  const empresaNomeRaw = document.getElementById('contaEmpresa').value.trim();
   const nome = document.getElementById('contaNome').value.trim();
+  if(!empresaNomeRaw){ toast('Selecione a empresa'); return; }
+  const empresaId = findEmpresaId(empresaNomeRaw);
+  if(empresaId===undefined){ toast('Empresa não encontrada — selecione uma da lista'); return; }
   if(!nome){ toast('Informe o nome da conta'); return; }
   const id = document.getElementById('contaId').value;
-  const data = { nome, obs:document.getElementById('contaObs').value, considerarGeral:document.getElementById('contaConsiderarGeral').checked };
+  const data = { nome, empresaId, obs:document.getElementById('contaObs').value, considerarGeral:document.getElementById('contaConsiderarGeral').checked };
   let rec;
   if(id){ rec = DB.contas.find(c=>c.id===id); Object.assign(rec, data); }
   else{ rec = {id:uid(), ...data}; DB.contas.push(rec); }
@@ -2160,6 +2326,74 @@ function excluirConta(id){
   if(vinculado){ toast('Não é possível excluir: há contratos, modelos ou lançamentos vinculados a esta conta'); return; }
   DB.contas = DB.contas.filter(c=>c.id!==id);
   deleteRecord('contas', id).then(()=>{ toast('Conta excluída'); renderAll(); });
+}
+
+/* ---------- EMPRESAS (ADMIN) ---------- */
+function findEmpresaId(nome){
+  if(!nome) return null;
+  const n = nome.trim().toLowerCase();
+  const e = DB.empresas.find(x=>x.nome.trim().toLowerCase()===n);
+  return e ? e.id : undefined;
+}
+function renderEmpresas(){
+  if(!isAdmin()) return;
+  const tbody = document.querySelector('#empresasTable tbody');
+  if(!tbody) return;
+  if(DB.empresas.length===0){
+    tbody.innerHTML = `<tr><td colspan="4" class="empty"><b>Nenhuma empresa cadastrada</b>Crie as empresas antes de cadastrar as contas.</td></tr>`;
+    document.getElementById('pagEmpresas').innerHTML = '';
+    return;
+  }
+  const { pageItems, totalPages, currentPage, total } = paginate(DB.empresas, 'empresas');
+  renderPagination('pagEmpresas', 'empresas', totalPages, currentPage, total);
+  tbody.innerHTML = pageItems.map(e=>{
+    const idsContas = contasDaEmpresa(e.id);
+    const saldo = saldoDeContas(idsContas);
+    return `<tr>
+      <td>${e.nome}</td>
+      <td style="color:var(--text-dim);">${e.obs||'—'}</td>
+      <td class="cell-num" style="color:${saldo>=0?'var(--green)':'var(--red)'}">${fmtMoney(saldo)}</td>
+      <td class="row-actions">
+        <button class="icon-btn" title="Editar" onclick="editarEmpresa('${e.id}')">✎</button>
+        <button class="icon-btn" title="Excluir" onclick="excluirEmpresa('${e.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+document.getElementById('btnNovaEmpresa').onclick = ()=>{
+  if(!isAdmin()) return;
+  document.getElementById('modalEmpresaTitle').textContent='Nova empresa';
+  document.getElementById('empresaId').value='';
+  document.getElementById('empresaNome').value='';
+  document.getElementById('empresaObs').value='';
+  openModal('overlayEmpresa');
+};
+function editarEmpresa(id){
+  if(!isAdmin()) return;
+  const e = DB.empresas.find(x=>x.id===id); if(!e) return;
+  document.getElementById('modalEmpresaTitle').textContent='Editar empresa';
+  document.getElementById('empresaId').value=e.id;
+  document.getElementById('empresaNome').value=e.nome;
+  document.getElementById('empresaObs').value=e.obs||'';
+  openModal('overlayEmpresa');
+}
+function salvarEmpresa(){
+  if(!isAdmin()) return;
+  const nome = document.getElementById('empresaNome').value.trim();
+  if(!nome){ toast('Informe o nome da empresa'); return; }
+  const id = document.getElementById('empresaId').value;
+  const data = { nome, obs:document.getElementById('empresaObs').value };
+  let rec;
+  if(id){ rec = DB.empresas.find(e=>e.id===id); Object.assign(rec, data); }
+  else{ rec = {id:uid(), ...data}; DB.empresas.push(rec); }
+  saveRecord('empresas', rec).then(()=>{ closeModal('overlayEmpresa'); toast('Empresa salva'); renderAll(); });
+}
+function excluirEmpresa(id){
+  if(!isAdmin()) return;
+  const vinculado = DB.contas.some(c=>c.empresaId===id);
+  if(vinculado){ toast('Não é possível excluir: há contas vinculadas a esta empresa'); return; }
+  DB.empresas = DB.empresas.filter(e=>e.id!==id);
+  deleteRecord('empresas', id).then(()=>{ toast('Empresa excluída'); renderAll(); });
 }
 
 /* ---------- USUARIOS (ADMIN) ---------- */
