@@ -3,7 +3,7 @@
 // Por quê: garante que o usuário sempre veja a versão mais recente do app sem precisar
 // reinstalar; o cache só entra em ação se a rede falhar (modo offline).
 
-const CACHE_NAME = 'softplus-financeiro-v2'; // ATUALIZAR este número a cada nova versão publicada
+const CACHE_NAME = 'softplus-financeiro-v5'; // ATUALIZAR este número a cada nova versão publicada
 
 // Arquivos essenciais para o app abrir mesmo sem internet.
 // Ajuste os caminhos se os arquivos não estiverem na mesma pasta do sw.js.
